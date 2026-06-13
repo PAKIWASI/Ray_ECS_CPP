@@ -1,5 +1,9 @@
 #!/bin/bash
 
+
+# init xwayland just to run raylib
+
+
 DISPLAY=:10
 
 Xwayland $DISPLAY -ac &
