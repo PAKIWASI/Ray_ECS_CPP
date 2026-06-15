@@ -15,7 +15,7 @@ using i16 = std::int16_t;
 using i32 = std::int32_t;
 using i64 = std::int64_t;
 
-using size = std::size_t;
+using size_t = std::size_t;
 
 
 template <typename T>

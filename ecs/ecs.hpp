@@ -2,6 +2,7 @@
 
 #include "wasi.hpp"
 
+#include <algorithm>
 #include <array>
 #include <bitset>
 #include <cassert>
@@ -17,6 +18,12 @@
 
 
 using namespace wasi;
+
+
+// TODO: research this:
+// currently we have ComponentArray which is pre inited with MAX_ENTITIES slots
+// is this good for large systems or should i do a swap-delete system and maps
+// with entity keys and array index values ?
 
 
 // Configuration
@@ -50,6 +57,8 @@ using Signature = std::bitset<MAX_COMPONENTS>;
 // each component is an id, using to access component array in the container in comp manager
 // this id is also the bit in Signature that signifies entity has this component
 using ComponentType = u8;
+
+using SystemType    = u8;
 
 
 // Entity Manager
@@ -90,6 +99,7 @@ class EntityManager
 
     // TODO: how will i be passing component types to this?
     // maybe i store a map ComponentArray<T>  -> idx in compmanager?
+    // or easier, pass the output of get_component_id, which we already have in compmanager
     void set_component(Entity e, ComponentType c)
     {
         assert(e < next_id && "Entity out of range");
@@ -99,7 +109,9 @@ class EntityManager
 
     auto has_component(Entity e, ComponentType c) -> bool
     {
-        
+        assert(e < next_id && "Entity out of range");
+        assert(c < MAX_COMPONENTS && "Component out of range");
+        return signatures.at(e).test(c);
     }
 };
 
@@ -136,7 +148,7 @@ concept ComponentType_t = std::default_initializable<T> // each comp arr is pre-
 // Templated subclass, this is the type scpecif ComponentArray<T>
 // The concept check happens here for each T
 template <ComponentType_t T>
-class ComponentArray : ICompArr
+class ComponentArray : public ICompArr  // class does private inheritance by default
 {
   private:
     std::array<T, MAX_ENTITIES> data{}; // default initialize
@@ -173,7 +185,7 @@ class ComponentManager
   private:
     // we need unique ptr as we can't store an abstract type in an array directly
     // it's not instantiable, and it would slice anyway
-    std::array<u_ptr<ICompArr>, MAX_COMPONENTS> comp_arrays{};
+    std::array<u_ptr<ICompArr>, MAX_COMPONENTS> comp_arrays{};  // array of pointers
 
     // handing out IDs to each type of component
     // first call to get_component_id<T>() with a new T yields the next id
@@ -201,13 +213,17 @@ class ComponentManager
     {
         ComponentType id = get_component_id<T>();
         assert(comp_arrays.at(id) == nullptr && "Component already registered");
+        // we store base class pointer but pass a derived class object pointer
+        // no explicit cast required
         comp_arrays.at(id) = std::make_unique<ComponentArray<T>>();
     }
 
     // type specifc operations
     // we assert in get_arr<>()
 
+    //register_component allocates the ComponentArray<T> and add_component puts data into a slot in that array
     template <ComponentType_t T>
+                                // copy or move, then move into array
     void add_component(Entity e, T comp)
     {
         get_arr<T>().add_data(e, std::move(comp));
@@ -257,11 +273,6 @@ class ComponentManager
 // Each system inherits from ISystem and implements the interface contract and gets the necessay members
 // We store ISystem pointers in SystemManager and call methods through the interface (type erasure)
 
-
-// TODO: concept
-// each system must have a set and a signature
-
-
 class ISystem
 {
   protected:
@@ -274,38 +285,81 @@ class ISystem
     auto operator=(const ISystem&) -> ISystem&  = delete;
     auto operator=(ISystem&&) -> ISystem&       = delete;
 
-    // TODO: we also want system specific init behaviour
+    // we also want system specific init behaviour
     // systems should make a subclass constructor
-    // is the base class constructor that sets signature called automatically?
+    // Then they should call base class constructor with signature arg
+    // If you don't call it explicitly, the compiler looks for a default constructor on ISystem
+    // which doesn't exist as we defined a parameterized one
+    // It will fail to compile and force every system to declare its signature.
 
     virtual ~ISystem() = default;
 
     // each system has unique update
     virtual void update(float dt) = 0;
 
-    // TODO: do i need a const lvalue ref?
     ISystem(const Signature& sig): signature(sig) {}
 
 
     void add_entity(Entity e)
     {
+        assert(e < MAX_ENTITIES && "Entity out of range");
+        assert(!entities.contains(e) && "Entity already in System");
 
+        entities.emplace(e);
     }
 
     void remove_entity(Entity e)
     {
+        assert(e < MAX_ENTITIES && "Entity out of range");
+        assert(entities.contains(e) && "Entity is not in System");
 
+        entities.erase(e);
     }
 
     auto has_entity(Entity e) -> bool
+    {
+        assert(e < MAX_ENTITIES && "Entity out of range");
+        return entities.contains(e);
+    }
+};
+
+// System concept: It must derive from ISystem
+template <typename T>
+concept System_t = std::derived_from<T, ISystem>;
+
+
+class SystemManager
+{
+  private:
+    std::array<u_ptr<ISystem>, MAX_SYSTEMS> systems;    // array of pointers
+
+    inline static SystemType next_sys_id = 0;
+  public:
+
+    template <System_t T>
+    auto get_system_id() -> SystemType
+    {
+        static SystemType id = next_sys_id++;
+        assert(id < MAX_SYSTEMS && "MAX_SYSTEMS reached");
+        return id;
+    }
+
+    template <System_t T>
+    void register_system()
+    {
+        SystemType id = get_system_id<T>();
+        assert(systems.at(id) == nullptr && "Component already registered");
+        // we store base class pointer but pass a derived class object pointer
+        systems.at(id) = std::make_unique<T>();
+    }
+
+
+    // When an entity's signature changes
+    void on_signature_change(Entity e, const Signature& new_sig)
     {
 
     }
 
 };
-
-
-
-
 
 
