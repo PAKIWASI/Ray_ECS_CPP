@@ -6,6 +6,7 @@
 #include <bitset>
 #include <cassert>
 #include <concepts>
+#include <memory>
 #include <vector>
 
 
@@ -108,9 +109,10 @@ struct ICompArr
 {
     ICompArr()                                   = default;
     ICompArr(const ICompArr&)                    = delete;
-    auto operator=(const ICompArr&) -> ICompArr& = delete;
     ICompArr(ICompArr&&)                         = delete;
+    auto operator=(const ICompArr&) -> ICompArr& = delete;
     auto operator=(ICompArr&&) -> ICompArr&      = delete;
+
     virtual ~ICompArr()                          = default; // one vtable entry
     // the only reason entity_destroyed is virtual is because ComponentManager holds ICompArr*
     // and needs to call something through the base pointer without knowing T
@@ -130,12 +132,13 @@ class ComponentArray : ICompArr
     void add_data(Entity e, T comp)
     {
         assert(e < MAX_ENTITIES && "Entity out of range");
-        data.at(e) = comp;
+        data.at(e) = std::move(comp);
     }
 
     void remove_data(Entity e)
     {
         assert(e < MAX_ENTITIES && "Entity out of range");
+        // TODO: do i need to explicitly delete previous slot if it owns memory?
         data.at(e) = T{};  // calls default constructor, correct for any ComponentType_t T
     }
 
@@ -158,13 +161,54 @@ class ComponentManager
     // we need unique ptr as we can't store an abstract type in an array directly
     // it's not instantiable, and it would slice anyway
     std::array<u_ptr<ICompArr>, MAX_COMPONENTS> comp_arrays{};
-    size size = 0;      // number of registered components
 
     // handing out IDs to each type of component
     // first call to get_component_id<T>() with a new T yields the next id
     // all subsequent calls give the same id (static var)
     // This id determines the index into comp_arrays and also the signature bit position
     inline static ComponentType next_comp_id = 0;
+
+
+    // for type specific operations, we need to cast down to derived class
+    template <ComponentType_t T>
+    [[nodiscard]] auto get_arr() -> ComponentArray<T>&
+    {
+        ComponentType id = get_component_id<T>();
+        assert(comp_arrays[id] != nullptr && "Component not registered");
+        // TODO: is this the correct cast?
+        return std::static_pointer_cast<ComponentArray<T>&>(comp_arrays.at(id));
+    }
+
+  public:
+
+    // fill a spot in the component array with a component of type T
+    template <ComponentType_t T>
+    void register_component()
+    {
+        ComponentType id = get_component_id<T>();
+        assert(comp_arrays.at(id) == nullptr && "Component already registered");
+        comp_arrays.at(id) = std::make_unique<ComponentArray<T>>();
+    }
+
+    // type specifc operations
+
+    template <ComponentType_t T>
+    void add_component(Entity e, T comp)
+    {
+        get_array<T>().add_data(e, std::move(comp));
+    }
+
+    template <ComponentType_t T>
+    void remove_component(Entity e)
+    {
+        get_array<T>().remove_data(e);
+    }
+
+    template <ComponentType_t T>
+    [[nodiscard]] auto get_component(Entity e) -> T&
+    {
+        return get_array<T>().get_data(e);
+    }
 
     template <ComponentType_t T>
     [[nodiscard]] static auto get_component_id() -> ComponentType
@@ -177,20 +221,16 @@ class ComponentManager
         return id;
     }
 
-  public:
-
+    // generic operation, no typecast needed. we do a vtable lookup
     void entity_destroyed(Entity e)
     {
-        // ERROR: Call to deleted constructor of 'value_type' (aka 'std::unique_ptr<ICompArr>') [ovl_deleted_init] 
-        // for (auto comparr : comp_arrays)
-        // {
-        //
-        // }
-
-        for (u32 i = 0; i < size; i++) {
-            // generic operation, no typecast needed. we do a vtable lookup
-            comp_arrays.at(i)->entity_destroyed(e);
+        for (const auto& comparr : comp_arrays)
+        {
+            if (comparr) {
+                comparr->entity_destroyed(e);
+            }
         }
+
     }
 };
 
