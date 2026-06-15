@@ -6,6 +6,7 @@
 #include <bitset>
 #include <cassert>
 #include <concepts>
+#include <flat_set>
 #include <memory>
 #include <vector>
 
@@ -26,8 +27,10 @@ using namespace wasi;
 constexpr u32 MAX_ENTITIES  = 1000;
 
 // total number of components that we can register
-// The map in component manager holds `MAX_COMPONENTS` component arrays
+// The container in component manager holds `MAX_COMPONENTS` component arrays
 constexpr u8 MAX_COMPONENTS = 32;
+
+constexpr u8 MAX_SYSTEMS    = 16;
 
 
 // Setup
@@ -39,12 +42,12 @@ using Entity = u32;
 
 // each entity has a signature of `MAX_COMPONENTS` bits that tells
 // which components they have. If the bit at i is set, that means entity
-// has the ith component and we can get it's data by doing comp_arr = map[i]
+// has the ith component and we can get it's data by doing comp_arr = container[i]
 // where i is the ith component array in the component manager then comp_arr[entity_index]
 // to get that entitity's data
 using Signature = std::bitset<MAX_COMPONENTS>;
 
-// each component is an id, using to access component array in the map in comp manager
+// each component is an id, using to access component array in the container in comp manager
 // this id is also the bit in Signature that signifies entity has this component
 using ComponentType = u8;
 
@@ -85,17 +88,21 @@ class EntityManager
         free_ids.emplace_back(e);
     }
 
+    // TODO: how will i be passing component types to this?
+    // maybe i store a map ComponentArray<T>  -> idx in compmanager?
     void set_component(Entity e, ComponentType c)
     {
+        assert(e < next_id && "Entity out of range");
+        assert(c < MAX_COMPONENTS && "Component out of range");
         signatures.at(e).set(c);
+    }
+
+    auto has_component(Entity e, ComponentType c) -> bool
+    {
+        
     }
 };
 
-
-// Concept: what counts as a component
-template <typename T>
-concept ComponentType_t = std::default_initializable<T> // each comp arr is pre-initialized
-                       && std::movable<T>;              // we move data into/outof the arr
 
 // Type Erasure
 // =============
@@ -120,6 +127,12 @@ struct ICompArr
 };
 
 
+// Concept: what counts as a component
+template <typename T>
+concept ComponentType_t = std::default_initializable<T> // each comp arr is pre-initialized
+                       && std::movable<T>;              // we move data into the arr
+
+
 // Templated subclass, this is the type scpecif ComponentArray<T>
 // The concept check happens here for each T
 template <ComponentType_t T>
@@ -138,8 +151,8 @@ class ComponentArray : ICompArr
     void remove_data(Entity e)
     {
         assert(e < MAX_ENTITIES && "Entity out of range");
-        // TODO: do i need to explicitly delete previous slot if it owns memory?
-        data.at(e) = T{};  // calls default constructor, correct for any ComponentType_t T
+        // The old object's destructor runs as part of the assignment operator
+        data.at(e) = T{};  // then calls default constructor for T
     }
 
     [[nodiscard]] auto get_data(Entity e) -> T&
@@ -175,8 +188,9 @@ class ComponentManager
     {
         ComponentType id = get_component_id<T>();
         assert(comp_arrays[id] != nullptr && "Component not registered");
-        // TODO: is this the correct cast?
-        return std::static_pointer_cast<ComponentArray<T>&>(comp_arrays.at(id));
+        // comp_arrays.at(id) returns a unique_ptr<ICompArr>&
+        // * dereferences the unique_ptr giving you ICompArr&, then static_cast casts that down to ComponentArray<T>&.
+        return static_cast<ComponentArray<T>&>(*comp_arrays.at(id));
     }
 
   public:
@@ -191,23 +205,24 @@ class ComponentManager
     }
 
     // type specifc operations
+    // we assert in get_arr<>()
 
     template <ComponentType_t T>
     void add_component(Entity e, T comp)
     {
-        get_array<T>().add_data(e, std::move(comp));
+        get_arr<T>().add_data(e, std::move(comp));
     }
 
     template <ComponentType_t T>
     void remove_component(Entity e)
     {
-        get_array<T>().remove_data(e);
+        get_arr<T>().remove_data(e);
     }
 
     template <ComponentType_t T>
     [[nodiscard]] auto get_component(Entity e) -> T&
     {
-        return get_array<T>().get_data(e);
+        return get_arr<T>().get_data(e);
     }
 
     template <ComponentType_t T>
@@ -233,5 +248,64 @@ class ComponentManager
 
     }
 };
+
+
+// System
+// =======
+// A system is any functionality that iterates upon a list of entities with a certain signature of components
+// Each system has a set of entities it acts on and a signature
+// Each system inherits from ISystem and implements the interface contract and gets the necessay members
+// We store ISystem pointers in SystemManager and call methods through the interface (type erasure)
+
+
+// TODO: concept
+// each system must have a set and a signature
+
+
+class ISystem
+{
+  protected:
+    std::flat_set<Entity> entities{};
+    const Signature signature;
+
+  public:
+    ISystem(const ISystem&)                     = delete;
+    ISystem(ISystem&&)                          = delete;
+    auto operator=(const ISystem&) -> ISystem&  = delete;
+    auto operator=(ISystem&&) -> ISystem&       = delete;
+
+    // TODO: we also want system specific init behaviour
+    // systems should make a subclass constructor
+    // is the base class constructor that sets signature called automatically?
+
+    virtual ~ISystem() = default;
+
+    // each system has unique update
+    virtual void update(float dt) = 0;
+
+    // TODO: do i need a const lvalue ref?
+    ISystem(const Signature& sig): signature(sig) {}
+
+
+    void add_entity(Entity e)
+    {
+
+    }
+
+    void remove_entity(Entity e)
+    {
+
+    }
+
+    auto has_entity(Entity e) -> bool
+    {
+
+    }
+
+};
+
+
+
+
 
 
