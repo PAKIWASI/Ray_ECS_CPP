@@ -9,6 +9,7 @@
 #include <concepts>
 #include <flat_set>
 #include <memory>
+#include <utility>
 #include <vector>
 
 
@@ -357,13 +358,15 @@ class SystemManager
         return id;
     }
 
-    template <SystemType_t T>
-    void register_system()
+    template <SystemType_t T, typename... Args>
+    void register_system(Args&&... args)
     {
         SystemType id = get_system_id<T>();
         assert(systems.at(id) == nullptr && "Component already registered");
         // we store base class pointer but pass a derived class object pointer
-        systems.at(id) = std::make_unique<T>();
+        systems.at(id) = std::make_unique<T>(std::forward<Args>(args)...);  // preserves rvals and lvals
+        // T needs to be default constructable but it' not, we need to pass a signature in the constructor
+        // So we will do perfect forwarding
     }
     // There is no data to add, each system has a unique update() and a signature and we will add entities to it
 
@@ -372,18 +375,23 @@ class SystemManager
     // some system by matching the signature again
     void on_signature_change(Entity e, Signature new_sig)
     {
-        for (const auto& sys : systems)
-        {
-                                    // atleast all bits required by this system are not set
-            if (sys->has_entity(e) && (sys->get_signature() & new_sig) != new_sig)
-            {
-                sys->remove_entity(e);
-            }
-            
-            
+        for (const auto& sys : systems) {
+            if (!sys) { continue; }
+            Signature curr_sig  = sys->get_signature();
+            bool qualifies = (curr_sig & new_sig) == curr_sig;
+            bool has       = sys->has_entity(e);
+
+            if (qualifies && !has)      { sys->add_entity(e); }
+            else if (!qualifies && has) { sys->remove_entity(e); }
         }
     }
 
+    void update(float dt)
+    {
+        for (const auto& sys : systems) {
+            sys->update(dt);
+        }
+    }
+
+    // TODO: will we ever need to only update specific systems and not others per frame?
 };
-
-
