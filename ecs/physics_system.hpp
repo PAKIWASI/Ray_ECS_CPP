@@ -7,6 +7,16 @@ using namespace ECS_COMPS_2D;
 
 class PhysicsSystem : public ISystem
 {
+  private:
+    static auto make_signature() -> Signature
+    {
+        Signature sig;
+        sig.set(ComponentManager::get_component_id<Transform2>());
+        sig.set(ComponentManager::get_component_id<RigidBody2>());
+        sig.set(ComponentManager::get_component_id<Gravity2>());
+        return sig;
+    }
+
   public:
     PhysicsSystem(const ComponentManager& cm)
         : ISystem(make_signature(), cm) {}
@@ -36,13 +46,4 @@ class PhysicsSystem : public ISystem
         }
     }
 
-  private:
-    static auto make_signature() -> Signature
-    {
-        Signature sig;
-        sig.set(ComponentManager::get_component_id<Transform2>());
-        sig.set(ComponentManager::get_component_id<RigidBody2>());
-        sig.set(ComponentManager::get_component_id<Gravity2>());
-        return sig;
-    }
 };

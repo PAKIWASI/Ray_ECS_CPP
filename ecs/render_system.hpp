@@ -7,6 +7,14 @@ using namespace ECS_COMPS_2D;
 
 class RenderSystem : public ISystem
 {
+  private:
+    static auto make_signature() -> Signature
+    {
+        Signature sig;
+        sig.set(ComponentManager::get_component_id<Transform2>());
+        return sig;
+    }
+
   public:
     RenderSystem(const ComponentManager& cm)
         : ISystem(make_signature(), cm) {}
@@ -24,14 +32,4 @@ class RenderSystem : public ISystem
             );
         }
     }
-
-  private:
-    static auto make_signature() -> Signature
-    {
-        Signature sig;
-        sig.set(ComponentManager::get_component_id<Transform2>());
-        return sig;
-    }
 };
-
-
