@@ -253,6 +253,15 @@ class ComponentManager
 
   public:
 
+    template <ComponentType_t T>
+    [[nodiscard]] static auto get_component_id() -> ComponentType
+    {
+        // static var inside func initialized only once
+        static ComponentType id = next_comp_id++;
+        assert(id < MAX_COMPONENTS && "MAX_COMPONENTS reached");
+        return id;
+    }
+
     // fill a spot in the component array with a component of type T
     template <ComponentType_t T>
     void register_component()
@@ -281,18 +290,9 @@ class ComponentManager
     }
 
     template <ComponentType_t T>
-    [[nodiscard]] auto get_component(Entity e) -> T&
+    [[nodiscard]] auto get_component(Entity e) const -> T&
     {
         return get_arr<T>().get_data(e);
-    }
-
-    template <ComponentType_t T>
-    [[nodiscard]] static auto get_component_id() -> ComponentType
-    {
-        // static var inside func initialized only once
-        static ComponentType id = next_comp_id++;
-        assert(id < MAX_COMPONENTS && "MAX_COMPONENTS reached");
-        return id;
     }
 
     // generic operation, no typecast needed. we do a vtable lookup
@@ -321,6 +321,7 @@ class ISystem
   protected:
     std::flat_set<Entity> entities{};
     const Signature signature;
+    const ComponentManager& component_manager;     // needed to read/write components in any system
 
   public:
     ISystem(const ISystem&)                     = delete;
@@ -340,7 +341,10 @@ class ISystem
     // each system has unique update
     virtual void update(float dt) = 0;
 
-    ISystem(Signature sig): signature(sig) {}
+    ISystem(Signature sig, const ComponentManager& cm)
+        : signature(sig)
+        , component_manager(cm)
+        {}
 
 
     void add_entity(Entity e)
@@ -388,6 +392,9 @@ class SystemManager
         assert(id < MAX_SYSTEMS && "MAX_SYSTEMS reached");
         return id;
     }
+
+    // TODO: this should take all the Compoent types that we want,
+    // make the signature and pass it to make_unique
 
     template <SystemType_t T, typename... Args>
     void register_system(Args&&... args)
@@ -484,7 +491,7 @@ class World
         component_manager->add_component<T>(e, std::move(comp));
 
         // get_component_id lives in ComponentManager, World bridges it to EntityManager
-        entity_manager->set_component(e, get_component_id<T>());
+        entity_manager->set_component(e, ComponentManager::get_component_id<T>());
         system_manager->on_signature_change(e, entity_manager->get_signature(e));
     }
 
@@ -497,17 +504,17 @@ class World
         system_manager->on_signature_change(e, entity_manager->get_signature(e));
     }
 
-    template <ComponentType_t T>
-    [[nodiscard]] auto get_component(Entity e) -> T&
-    {
-        return component_manager->get_component<T>(e);
-    }
+    // template <ComponentType_t T>
+    // [[nodiscard]] auto get_component(Entity e) -> T&
+    // {
+    //     return component_manager->get_component<T>(e);
+    // }
 
-    template <ComponentType_t T>
-    [[nodiscard]] static auto get_component_id() -> ComponentType
-    {
-        return ComponentManager::get_component_id<T>();
-    }
+    // template <ComponentType_t T>
+    // [[nodiscard]] static auto get_component_id() -> ComponentType
+    // {
+    //     return ComponentManager::get_component_id<T>();
+    // }
 
     // System API
 
