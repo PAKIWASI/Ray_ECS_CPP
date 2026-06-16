@@ -31,15 +31,25 @@ auto main() -> int
     InitWindow(800, 600, "ECS demo");
     SetTargetFPS(60);
 
+
+    // pre-build schedules once at startup
+    Schedule physics_only;
+    physics_only.set(SystemManager::get_system_id<PhysicsSystem>());
+
+    Schedule render_only;
+    render_only.set(SystemManager::get_system_id<RenderSystem>());
+
+
     while (!WindowShouldClose())
     {
         float dt = GetFrameTime();
 
-        world.update(dt);   // runs PhysicsSystem then RenderSystem
+        // runs PhysicsSystem then RenderSystem
+        world.update(dt, physics_only);
 
         BeginDrawing();
-            ClearBackground(BLACK);
-            world.update(dt);   // BUG: don't call twice — move render into draw block
+            ClearBackground(RAYWHITE);
+            world.update(dt, render_only);
         EndDrawing();
     }
 

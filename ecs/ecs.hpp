@@ -57,6 +57,8 @@ using ComponentType = u8;
 
 using SystemType    = u8;
 
+using Schedule      = std::bitset<MAX_SYSTEMS>;
+
 
 // Entity Manager
 // ===============
@@ -242,7 +244,7 @@ class ComponentManager
 
     // for type specific operations, we need to cast down to derived class
     template <ComponentType_t T>
-    [[nodiscard]] auto get_arr() -> ComponentArray<T>&
+    [[nodiscard]] auto get_arr() const -> ComponentArray<T>&
     {
         ComponentType id = get_component_id<T>();
         assert(comp_arrays[id] != nullptr && "Component not registered");
@@ -381,15 +383,12 @@ class SystemManager
   private:
     std::array<u_ptr<ISystem>, MAX_SYSTEMS> systems;    // array of pointers to ISystem
 
-    // defines which systems to run in next update(), if bit is set, we run that system
-    std::bitset<MAX_SYSTEMS> schedule;
-
     inline static SystemType next_sys_id = 0;
 
   public:
 
     template <SystemType_t T>
-    auto get_system_id() -> SystemType
+    static auto get_system_id() -> SystemType
     {
         static SystemType id = next_sys_id++;
         assert(id < MAX_SYSTEMS && "MAX_SYSTEMS reached");
@@ -407,34 +406,6 @@ class SystemManager
         // So we will do perfect forwarding
     }
     // There is no data to add, each system has a unique update() and a signature and we will add entities to it
-
-    template <SystemType_t T>
-    void set_system_on()
-    {
-        SystemType id = get_system_id<T>();
-        assert(systems.at(id) != nullptr && "Component not registered");
-
-        schedule.set(id);
-    }
-
-    template <SystemType_t T>
-    void set_system_off()
-    {
-        SystemType id = get_system_id<T>();
-        assert(systems.at(id) != nullptr && "Component not registered");
-
-        schedule.reset(id);
-    }
-
-    template <SystemType_t T>
-    auto is_system_on() -> bool
-    {
-        SystemType id = get_system_id<T>();
-        assert(systems.at(id) != nullptr && "Component not registered");
-
-        return schedule.test(id);
-    }
-
 
     // When an entity's signature changes, see if we need to remove it from
     // some system by matching the signature again
@@ -460,21 +431,14 @@ class SystemManager
         }
     }
 
-    void update(float dt)
+    void update(float dt, Schedule schedule)
     {
-        // for (const auto& sys : systems) {
-        //     if (sys) {
-        //         sys->update(dt);
-        //     }
-        // }
-
         for (u8 i = 0; i < MAX_SYSTEMS; ++i) {
             const auto& sys = systems.at(i);
-            if (sys && schedule.test(i)) {
+            if (schedule.test(i) && sys) {
                 sys->update(dt);
             }
         }
-
     }
 };
 
@@ -559,9 +523,9 @@ class World
         system_manager->register_system<T>(std::forward<Args>(args)...);
     }
 
-    void update(float dt)
+    void update(float dt, Schedule schedule)
     {
-        system_manager->update(dt);
+        system_manager->update(dt, schedule);
     }
 
     // general
