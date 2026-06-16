@@ -429,7 +429,9 @@ class SystemManager
     void update(float dt)
     {
         for (const auto& sys : systems) {
-            sys->update(dt);
+            if (sys) {
+                sys->update(dt);
+            }
         }
     }
     // TODO: will we ever need to only update specific systems and not others per frame?

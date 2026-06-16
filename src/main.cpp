@@ -1,10 +1,24 @@
+#include <print>
 #include <raylib.h>
-#include "../ecs/ecs.hpp"
+#include "ecs.hpp"
+
 
 
 
 auto main() -> int
 {
-    const int a = 5;
+    World world{};
+
+    Entity e = world.create_entity();
+
+    std::println("{}", e);
+
+    world.update(1);
+
+    world.register_component<Transform>();
+
+    std::println("{}", World::get_component_id<Transform>());
+
+    return 0;
 };
 
