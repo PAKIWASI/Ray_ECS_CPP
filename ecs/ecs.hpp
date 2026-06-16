@@ -34,6 +34,8 @@ constexpr u8 MAX_COMPONENTS = 32;
 
 constexpr u8 MAX_SYSTEMS    = 16;
 
+constexpr u32 PRE_INIT_SIZE = 100;
+
 
 // Setup
 // ======
@@ -73,7 +75,7 @@ class EntityManager
   public:
 
     EntityManager() {
-        free_ids.reserve(100);
+        free_ids.reserve(PRE_INIT_SIZE);
     }
 
     [[nodiscard]] auto create() -> Entity
@@ -96,14 +98,18 @@ class EntityManager
         free_ids.emplace_back(e);
     }
 
-    // TODO: how will i be passing component types to this?
-    // maybe i store a map ComponentArray<T>  -> idx in compmanager?
-    // or easier, pass the output of get_component_id, which we already have in compmanager
     void set_component(Entity e, ComponentType c)
     {
         assert(e < next_id && "Entity out of range");
         assert(c < MAX_COMPONENTS && "Component out of range");
         signatures.at(e).set(c);
+    }
+
+    void unset_component(Entity e, ComponentType c)
+    {
+        assert(e < next_id && "Entity out of range");
+        assert(c < MAX_COMPONENTS && "Component out of range");
+        signatures.at(e).reset(c);
     }
 
     auto has_component(Entity e, ComponentType c) -> bool
@@ -171,8 +177,8 @@ class ComponentArray : public ICompArr  // class does private inheritace by defa
 
 public:
     ComponentArray() {
-        data.reserve(100);
-        idx_to_entity.reserve(100);
+        data.reserve(PRE_INIT_SIZE);
+        idx_to_entity.reserve(PRE_INIT_SIZE);
         entity_to_idx.fill(INVALID);
     }
 
@@ -337,8 +343,6 @@ class ISystem
     ISystem(Signature sig): signature(sig) {}
 
 
-    // TODO: the caller to this matches the signature with entity's signature
-
     void add_entity(Entity e)
     {
         assert(e < MAX_ENTITIES && "Entity out of range");
@@ -412,6 +416,15 @@ class SystemManager
             else if (!qualifies && has) { sys->remove_entity(e); }
         }
     }
+    
+    void on_entity_destroyed(Entity e)
+    {
+        for (const auto& sys : systems) {
+            if (sys && sys->has_entity(e)) {
+                sys->remove_entity(e);
+            }
+        }
+    }
 
     void update(float dt)
     {
@@ -434,12 +447,78 @@ class World
     u_ptr<SystemManager>    system_manager;
 
   public:
+    World()
+        : entity_manager    (std::make_unique<EntityManager>())
+        , component_manager (std::make_unique<ComponentManager>())
+        , system_manager    (std::make_unique<SystemManager>())
+    {}
 
-    World() {
-        entity_manager    = std::make_unique<EntityManager>();
-        component_manager = std::make_unique<ComponentManager>();
-        system_manager    = std::make_unique<SystemManager>();
+    // Entity API
+
+    [[nodiscard]] auto create_entity() -> Entity
+    {
+        return entity_manager->create();
     }
 
+    void destroy_entity(Entity e)
+    {
+        // systems and components must clean up before the id is recycled
+        system_manager->    on_entity_destroyed(e);
+        component_manager-> entity_destroyed(e);
+        entity_manager->    destroy(e);
+    }
 
+    // Component API
+
+    template <ComponentType_t T>
+    void register_component()
+    {
+        component_manager->register_component<T>();
+    }
+
+    template <ComponentType_t T>
+    void add_component(Entity e, T comp)
+    {
+        component_manager->add_component<T>(e, std::move(comp));
+
+        // get_component_id lives in ComponentManager, World bridges it to EntityManager
+        entity_manager->set_component(e, get_component_id<T>());
+        system_manager->on_signature_change(e, entity_manager->get_signature(e));
+    }
+
+    template <ComponentType_t T>
+    void remove_component(Entity e)
+    {
+        component_manager->remove_component<T>(e);
+
+        entity_manager->unset_component(e, ComponentManager::get_component_id<T>());
+        system_manager->on_signature_change(e, entity_manager->get_signature(e));
+    }
+
+    template <ComponentType_t T>
+    [[nodiscard]] auto get_component(Entity e) -> T&
+    {
+        return component_manager->get_component<T>(e);
+    }
+
+    template <ComponentType_t T>
+    [[nodiscard]] static auto get_component_id() -> ComponentType
+    {
+        return ComponentManager::get_component_id<T>();
+    }
+
+    // System API
+
+    template <SystemType_t T, typename... Args>
+    void register_system(Args&&... args)
+    {
+        system_manager->register_system<T>(std::forward<Args>(args)...);
+    }
+
+    void update(float dt)
+    {
+        system_manager->update(dt);
+    }
 };
+
+
