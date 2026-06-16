@@ -319,9 +319,9 @@ class ComponentManager
 class ISystem
 {
   protected:
-    std::flat_set<Entity> entities{};
-    const Signature signature;
-    const ComponentManager& component_manager;     // needed to read/write components in any system
+    std::flat_set<Entity>   entities{};
+    const Signature         signature;
+    const ComponentManager& component_manager;  // needed to read/write components in any system
 
   public:
     ISystem(const ISystem&)                     = delete;
@@ -381,6 +381,9 @@ class SystemManager
   private:
     std::array<u_ptr<ISystem>, MAX_SYSTEMS> systems;    // array of pointers to ISystem
 
+    // defines which systems to run in next update(), if bit is set, we run that system
+    std::bitset<MAX_SYSTEMS> schedule;
+
     inline static SystemType next_sys_id = 0;
 
   public:
@@ -393,9 +396,6 @@ class SystemManager
         return id;
     }
 
-    // TODO: this should take all the Compoent types that we want,
-    // make the signature and pass it to make_unique
-
     template <SystemType_t T, typename... Args>
     void register_system(Args&&... args)
     {
@@ -407,6 +407,33 @@ class SystemManager
         // So we will do perfect forwarding
     }
     // There is no data to add, each system has a unique update() and a signature and we will add entities to it
+
+    template <SystemType_t T>
+    void set_system_on()
+    {
+        SystemType id = get_system_id<T>();
+        assert(systems.at(id) != nullptr && "Component not registered");
+
+        schedule.set(id);
+    }
+
+    template <SystemType_t T>
+    void set_system_off()
+    {
+        SystemType id = get_system_id<T>();
+        assert(systems.at(id) != nullptr && "Component not registered");
+
+        schedule.reset(id);
+    }
+
+    template <SystemType_t T>
+    auto is_system_on() -> bool
+    {
+        SystemType id = get_system_id<T>();
+        assert(systems.at(id) != nullptr && "Component not registered");
+
+        return schedule.test(id);
+    }
 
 
     // When an entity's signature changes, see if we need to remove it from
@@ -435,13 +462,20 @@ class SystemManager
 
     void update(float dt)
     {
-        for (const auto& sys : systems) {
-            if (sys) {
+        // for (const auto& sys : systems) {
+        //     if (sys) {
+        //         sys->update(dt);
+        //     }
+        // }
+
+        for (u8 i = 0; i < MAX_SYSTEMS; ++i) {
+            const auto& sys = systems.at(i);
+            if (sys && schedule.test(i)) {
                 sys->update(dt);
             }
         }
+
     }
-    // TODO: will we ever need to only update specific systems and not others per frame?
 };
 
 
@@ -454,6 +488,7 @@ class World
     u_ptr<EntityManager>    entity_manager;
     u_ptr<ComponentManager> component_manager;
     u_ptr<SystemManager>    system_manager;
+
 
   public:
     World()
@@ -527,6 +562,13 @@ class World
     void update(float dt)
     {
         system_manager->update(dt);
+    }
+
+    // general
+
+    [[nodiscard]] auto get_component_manager() -> ComponentManager&
+    {
+        return *component_manager;
     }
 };
 

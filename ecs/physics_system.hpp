@@ -32,7 +32,7 @@ class PhysicsSystem : public ISystem
             transform.pos.y += rigidbody.v.y * dt;
 
             // reset acceleration (forces are re-applied each frame)
-            rigidbody.a = {0, 0};
+            rigidbody.a = {.x=0, .y=0};
         }
     }
 
