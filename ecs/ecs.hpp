@@ -434,9 +434,8 @@ class SystemManager
     void update(float dt, Schedule schedule)
     {
         for (u8 i = 0; i < MAX_SYSTEMS; ++i) {
-            const auto& sys = systems.at(i);
-            if (schedule.test(i) && sys) {
-                sys->update(dt);
+            if (schedule.test(i) && systems.at(i)) {
+                systems.at(i)->update(dt);
             }
         }
     }
