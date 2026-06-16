@@ -1,6 +1,6 @@
+#include "ecs.hpp"
 #include <print>
 #include <raylib.h>
-#include "ecs.hpp"
 
 
 
@@ -21,4 +21,3 @@ auto main() -> int
 
     return 0;
 };
-
