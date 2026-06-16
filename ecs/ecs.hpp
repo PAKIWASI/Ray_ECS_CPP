@@ -21,7 +21,7 @@ using namespace wasi;
 
 
 // TODO: research this:
-// currently we have ComponentArray which is pre inited with MAX_ENTITIES slots
+// currently we have ComponentArrays where each is pre inited with MAX_ENTITIES slots
 // is this good for large systems or should i do a swap-delete system and maps
 // with entity keys and array index values ?
 
@@ -77,7 +77,7 @@ class EntityManager
     std::array<Signature, MAX_ENTITIES> signatures;
   public:
 
-    [[nodiscard]] auto create_entity() -> Entity
+    [[nodiscard]] auto create() -> Entity
     {
         if (!free_ids.empty()) {
             Entity recycled = free_ids.back();
@@ -88,7 +88,7 @@ class EntityManager
         return next_id++;
     }
 
-    void destroy_entity(Entity e)
+    void destroy(Entity e)
     {
         // max value of next_id is MAX_ENTITIES
         assert(e < next_id && "Entity out of range");
@@ -112,6 +112,18 @@ class EntityManager
         assert(e < next_id && "Entity out of range");
         assert(c < MAX_COMPONENTS && "Component out of range");
         return signatures.at(e).test(c);
+    }
+
+    void set_signature(Entity e, Signature sig)
+    {
+        assert(e < next_id && "Entity out of range");
+        signatures.at(e) = sig;
+    }
+
+    [[nodiscard]] auto get_signature(Entity e) -> Signature
+    {
+        assert(e < next_id && "Entity out of range");
+        return signatures.at(e);
     }
 };
 
@@ -221,10 +233,9 @@ class ComponentManager
     // type specifc operations
     // we assert in get_arr<>()
 
-    //register_component allocates the ComponentArray<T> and add_component puts data into a slot in that array
+    // register_component allocates the ComponentArray<T> and add_component puts data into a slot in that array
     template <ComponentType_t T>
-                                // copy or move, then move into array
-    void add_component(Entity e, T comp)
+    void add_component(Entity e, T comp) // copy or move, then move into array
     {
         get_arr<T>().add_data(e, std::move(comp));
     }
@@ -246,9 +257,7 @@ class ComponentManager
     {
         // static var inside func initialized only once
         static ComponentType id = next_comp_id++;
-
         assert(id < MAX_COMPONENTS && "MAX_COMPONENTS reached");
-
         return id;
     }
 
@@ -297,14 +306,15 @@ class ISystem
     // each system has unique update
     virtual void update(float dt) = 0;
 
-    ISystem(const Signature& sig): signature(sig) {}
+    ISystem(Signature sig): signature(sig) {}
 
+
+    // TODO: the caller to this matches the signature with entity's signature
 
     void add_entity(Entity e)
     {
         assert(e < MAX_ENTITIES && "Entity out of range");
         assert(!entities.contains(e) && "Entity already in System");
-
         entities.emplace(e);
     }
 
@@ -312,7 +322,6 @@ class ISystem
     {
         assert(e < MAX_ENTITIES && "Entity out of range");
         assert(entities.contains(e) && "Entity is not in System");
-
         entities.erase(e);
     }
 
@@ -321,22 +330,26 @@ class ISystem
         assert(e < MAX_ENTITIES && "Entity out of range");
         return entities.contains(e);
     }
+
+    [[nodiscard]] auto get_signature() -> Signature { return signature; }
 };
+
 
 // System concept: It must derive from ISystem
 template <typename T>
-concept System_t = std::derived_from<T, ISystem>;
+concept SystemType_t = std::derived_from<T, ISystem>;
 
 
 class SystemManager
 {
   private:
-    std::array<u_ptr<ISystem>, MAX_SYSTEMS> systems;    // array of pointers
+    std::array<u_ptr<ISystem>, MAX_SYSTEMS> systems;    // array of pointers to ISystem
 
     inline static SystemType next_sys_id = 0;
+
   public:
 
-    template <System_t T>
+    template <SystemType_t T>
     auto get_system_id() -> SystemType
     {
         static SystemType id = next_sys_id++;
@@ -344,7 +357,7 @@ class SystemManager
         return id;
     }
 
-    template <System_t T>
+    template <SystemType_t T>
     void register_system()
     {
         SystemType id = get_system_id<T>();
@@ -352,12 +365,23 @@ class SystemManager
         // we store base class pointer but pass a derived class object pointer
         systems.at(id) = std::make_unique<T>();
     }
+    // There is no data to add, each system has a unique update() and a signature and we will add entities to it
 
 
-    // When an entity's signature changes
-    void on_signature_change(Entity e, const Signature& new_sig)
+    // When an entity's signature changes, see if we need to remove it from
+    // some system by matching the signature again
+    void on_signature_change(Entity e, Signature new_sig)
     {
-
+        for (const auto& sys : systems)
+        {
+                                    // atleast all bits required by this system are not set
+            if (sys->has_entity(e) && (sys->get_signature() & new_sig) != new_sig)
+            {
+                sys->remove_entity(e);
+            }
+            
+            
+        }
     }
 
 };
