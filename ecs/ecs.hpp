@@ -7,7 +7,6 @@
 #include <bitset>
 #include <cassert>
 #include <concepts>
-#include <cstddef>
 #include <flat_set>
 #include <memory>
 #include <utility>
@@ -70,8 +69,12 @@ class EntityManager
     // when an entity dies, it's id goes here for reuse
     std::vector<Entity> free_ids;
 
-    std::array<Signature, MAX_ENTITIES> signatures;
+    std::array<Signature, MAX_ENTITIES> signatures{};
   public:
+
+    EntityManager() {
+        free_ids.reserve(100);
+    }
 
     [[nodiscard]] auto create() -> Entity
     {
@@ -124,8 +127,8 @@ class EntityManager
 };
 
 
-// Type Erasure
-// =============
+// Component Manager
+// ==================
 // we need to store different ComponentArray<T> in the same container
 // we have a interface with type agnostic methods. container will have that type
 // when we need type specific stuff, we will cast to the correct type
@@ -161,13 +164,17 @@ class ComponentArray : public ICompArr  // class does private inheritace by defa
     // sentinal value indicating ith entity has no data in this array
     static constexpr u32 INVALID = std::numeric_limits<u32>::max();
 
-    std::vector<T>      data{};         // actual data - we have `active_entities` valid slots
+    std::vector<T>      data;         // actual data - we have `active_entities` valid slots
     std::vector<Entity> idx_to_entity;  // maps data's slot index to what entity owns it
     std::array<u32, MAX_ENTITIES> entity_to_idx{}; // maps which entity owns what slot index
     u32 active_entities = 0;
 
 public:
-    ComponentArray() { entity_to_idx.fill(INVALID); }
+    ComponentArray() {
+        data.reserve(100);
+        idx_to_entity.reserve(100);
+        entity_to_idx.fill(INVALID);
+    }
 
     void add_data(Entity e, T comp) // simple T comp allows rvalues and lvalues alike
     {
@@ -296,8 +303,8 @@ class ComponentManager
 };
 
 
-// System
-// =======
+// System Manager
+// ===============
 // A system is any functionality that iterates upon a list of entities with a certain signature of components
 // Each system has a set of entities it acts on and a signature
 // Each system inherits from ISystem and implements the interface contract and gets the necessay members
@@ -413,4 +420,26 @@ class SystemManager
         }
     }
     // TODO: will we ever need to only update specific systems and not others per frame?
+};
+
+
+// The World: Orchestrator
+// ========================
+
+class World
+{
+  private:
+    u_ptr<EntityManager>    entity_manager;
+    u_ptr<ComponentManager> component_manager;
+    u_ptr<SystemManager>    system_manager;
+
+  public:
+
+    World() {
+        entity_manager    = std::make_unique<EntityManager>();
+        component_manager = std::make_unique<ComponentManager>();
+        system_manager    = std::make_unique<SystemManager>();
+    }
+
+
 };
