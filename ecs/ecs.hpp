@@ -7,6 +7,7 @@
 #include <bitset>
 #include <cassert>
 #include <concepts>
+#include <cstddef>
 #include <flat_set>
 #include <memory>
 #include <utility>
@@ -19,12 +20,6 @@
 
 
 using namespace wasi;
-
-
-// TODO: research this:
-// currently we have ComponentArrays where each is pre inited with MAX_ENTITIES slots
-// is this good for large systems or should i do a swap-delete system and maps
-// with entity keys and array index values ?
 
 
 // Configuration
@@ -161,35 +156,60 @@ concept ComponentType_t = std::default_initializable<T> // each comp arr is pre-
 // Templated subclass, this is the type scpecif ComponentArray<T>
 // The concept check happens here for each T
 template <ComponentType_t T>
-class ComponentArray : public ICompArr  // class does private inheritance by default
+class ComponentArray : public ICompArr  // class does private inheritace by default
 {
-  private:
-    std::array<T, MAX_ENTITIES> data{}; // default initialize
-  public:
+    // sentinal value indicating ith entity has no data in this array
+    static constexpr u32 INVALID = std::numeric_limits<u32>::max();
 
-    void add_data(Entity e, T comp)
+    std::vector<T>      data{};         // actual data - we have `active_entities` valid slots
+    std::vector<Entity> idx_to_entity;  // maps data's slot index to what entity owns it
+    std::array<u32, MAX_ENTITIES> entity_to_idx{}; // maps which entity owns what slot index
+    u32 active_entities = 0;
+
+public:
+    ComponentArray() { entity_to_idx.fill(INVALID); }
+
+    void add_data(Entity e, T comp) // simple T comp allows rvalues and lvalues alike
     {
         assert(e < MAX_ENTITIES && "Entity out of range");
-        data.at(e) = std::move(comp);
+        assert(entity_to_idx[e] == INVALID && "Entity already has component");
+
+        entity_to_idx[e] = active_entities;
+        idx_to_entity.emplace_back(e);
+        data.emplace_back(std::move(comp));
+        active_entities++;
     }
 
     void remove_data(Entity e)
     {
         assert(e < MAX_ENTITIES && "Entity out of range");
-        // The old object's destructor runs as part of the assignment operator
-        data.at(e) = T{};  // then calls default constructor for T
+        u32 idx = entity_to_idx[e];
+        assert(idx != INVALID && "Entity does not have component");
+
+        u32 last_idx           = active_entities - 1;
+        Entity last_entity     = idx_to_entity[last_idx];
+
+        // swap
+        data[idx]              = std::move(data[last_idx]);
+        idx_to_entity[idx]     = last_entity;
+        entity_to_idx[last_entity] = idx;
+
+        // delete
+        entity_to_idx[e]       = INVALID;
+        data.pop_back();
+        idx_to_entity.pop_back();
+        active_entities--;
     }
 
     [[nodiscard]] auto get_data(Entity e) -> T&
     {
         assert(e < MAX_ENTITIES && "Entity out of range");
-        return data.at(e);
+        u32 idx = entity_to_idx[e];
+        assert(idx != INVALID && "Entity does not have component");
+        return data[idx];
     }
 
-    void entity_destroyed(Entity e) override
-    {
-        remove_data(e);
-    }
+    void entity_destroyed(Entity e) override { remove_data(e); }
 };
 
 
@@ -392,6 +412,5 @@ class SystemManager
             sys->update(dt);
         }
     }
-
     // TODO: will we ever need to only update specific systems and not others per frame?
 };
