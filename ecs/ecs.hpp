@@ -141,7 +141,7 @@ class EntityManager
 // we have a interface with type agnostic methods. container will have that type
 // when we need type specific stuff, we will cast to the correct type
 
-// The Rule of Five warning fires because you declared a destructor but nothing else
+// The Rule of Five warning fires because we declared a destructor but nothing else
 // Since ICompArr is a pure interface not meant to be copied or moved, explicitly delete those
 struct ICompArr
 {
@@ -403,7 +403,8 @@ class SystemManager
         // we store base class pointer but pass a derived class object pointer
         systems.at(id) = std::make_unique<T>(std::forward<Args>(args)...);  // preserves rvals and lvals
         // T needs to be default constructable but it' not, we need to pass a signature in the constructor
-        // So we will do perfect forwarding
+        // So we will do perfect forwarding, args are passed to the constructor
+        // the constructor must declare all expected args and init them
     }
     // There is no data to add, each system has a unique update() and a signature and we will add entities to it
 

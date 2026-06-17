@@ -5,21 +5,19 @@
 
 using namespace ECS_COMPS_2D;
 
+
+
 class PhysicsSystem : public ISystem
 {
   private:
-    static auto make_signature() -> Signature
-    {
-        Signature sig;
-        sig.set(ComponentManager::get_component_id<Transform2>());
-        sig.set(ComponentManager::get_component_id<RigidBody2>());
-        sig.set(ComponentManager::get_component_id<Gravity2>());
-        return sig;
-    }
+    const u32 screen_w, screen_h;   // needed for bounce effect
 
   public:
-    PhysicsSystem(const ComponentManager& cm)
-        : ISystem(make_signature(), cm) {}
+    PhysicsSystem(const ComponentManager& cm, u32 screen_w, u32 screen_h)
+        : ISystem(make_signature(), cm)
+        , screen_w {screen_w}
+        , screen_h {screen_h} 
+    {}
 
     void update(float dt) override
     {
@@ -46,4 +44,13 @@ class PhysicsSystem : public ISystem
         }
     }
 
+  private:
+    static auto make_signature() -> Signature
+    {
+        Signature sig{};
+        sig.set(ComponentManager::get_component_id<Transform2>());
+        sig.set(ComponentManager::get_component_id<RigidBody2>());
+        sig.set(ComponentManager::get_component_id<Gravity2>());
+        return sig;
+    }
 };
