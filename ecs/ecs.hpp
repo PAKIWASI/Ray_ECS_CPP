@@ -80,7 +80,7 @@ class EntityManager
         free_ids.reserve(PRE_INIT_SIZE);
     }
 
-    [[nodiscard]] auto create() -> Entity
+    [[nodiscard]] auto create(Signature sig = 0) -> Entity
     {
         if (!free_ids.empty()) {
             Entity recycled = free_ids.back();
@@ -88,6 +88,9 @@ class EntityManager
             return recycled;
         }
         assert(next_id < MAX_ENTITIES && "MAX_ENTITIES reached");
+        if (sig != 0) {
+            signatures.at(next_id) = sig;
+        }
         return next_id++;
     }
 
@@ -172,7 +175,7 @@ class ComponentArray : public ICompArr  // class does private inheritace by defa
     // sentinal value indicating ith entity has no data in this array
     static constexpr u32 INVALID = std::numeric_limits<u32>::max();
 
-    std::vector<T>      data;         // actual data - we have `active_entities` valid slots
+    std::vector<T>      data;           // actual data - we have `active_entities` valid slots
     std::vector<Entity> idx_to_entity;  // maps data's slot index to what entity owns it
     std::array<u32, MAX_ENTITIES> entity_to_idx{}; // maps which entity owns what slot index
     u32 active_entities = 0;
@@ -242,6 +245,8 @@ class ComponentManager
     inline static ComponentType next_comp_id = 0;
 
 
+  public:
+
     // for type specific operations, we need to cast down to derived class
     template <ComponentType_t T>
     [[nodiscard]] auto get_arr() const -> ComponentArray<T>&
@@ -253,7 +258,6 @@ class ComponentManager
         return static_cast<ComponentArray<T>&>(*comp_arrays.at(id));
     }
 
-  public:
 
     template <ComponentType_t T>
     [[nodiscard]] static auto get_component_id() -> ComponentType
@@ -323,7 +327,6 @@ class ISystem
   protected:
     std::flat_set<Entity>   entities{};
     const Signature         signature;
-    const ComponentManager& component_manager;  // needed to read/write components in any system
 
   public:
     ISystem(const ISystem&)                     = delete;
@@ -343,10 +346,8 @@ class ISystem
     // each system has unique update
     virtual void update(float dt) = 0;
 
-    ISystem(Signature sig, const ComponentManager& cm)
-        : signature(sig)
-        , component_manager(cm)
-        {}
+
+    ISystem(Signature sig) : signature(sig) {}
 
 
     void add_entity(Entity e)
@@ -463,9 +464,9 @@ class World
 
     // Entity API
 
-    [[nodiscard]] auto create_entity() -> Entity
+    [[nodiscard]] auto create_entity(Signature sig = 0) -> Entity
     {
-        return entity_manager->create();
+        return entity_manager->create(sig);
     }
 
     void destroy_entity(Entity e)
@@ -491,6 +492,7 @@ class World
 
         // get_component_id lives in ComponentManager, World bridges it to EntityManager
         entity_manager->set_component(e, ComponentManager::get_component_id<T>());
+        // This handles adding/removing to systems
         system_manager->on_signature_change(e, entity_manager->get_signature(e));
     }
 
@@ -530,7 +532,7 @@ class World
 
     // general
 
-    [[nodiscard]] auto get_component_manager() -> ComponentManager&
+    [[nodiscard]] auto get_component_manager() const -> const ComponentManager&
     {
         return *component_manager;
     }

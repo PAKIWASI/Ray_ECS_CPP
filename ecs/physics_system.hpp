@@ -1,3 +1,4 @@
+// ecs/physics_system.hpp
 #pragma once
 
 #include "ecs.hpp"
@@ -5,46 +6,27 @@
 
 using namespace ECS_COMPS_2D;
 
-
-
 class PhysicsSystem : public ISystem
 {
-  private:
-    const u32 screen_w, screen_h;   // needed for bounce effect
-
   public:
-    PhysicsSystem(const ComponentManager& cm, u32 screen_w, u32 screen_h)
-        : ISystem(make_signature(), cm)
-        , screen_w {screen_w}
-        , screen_h {screen_h} 
+    PhysicsSystem(const ComponentManager& cm)
+        : ISystem(make_signature())
+        , transforms(cm.get_arr<Transform2>())
+        , rigidbodies(cm.get_arr<RigidBody2>())
+        , gravities(cm.get_arr<Gravity2>())
     {}
+
 
     void update(float dt) override
     {
-        for (Entity e : entities)
-        {
-            auto& transform  = component_manager.get_component<Transform2>(e);
-            auto& rigidbody  = component_manager.get_component<RigidBody2>(e);
-            auto& gravity    = component_manager.get_component<Gravity2>(e);
-
-            // apply gravity to acceleration
-            rigidbody.a.x += gravity.force.x;
-            rigidbody.a.y += gravity.force.y;
-
-            // integrate velocity
-            rigidbody.v.x += rigidbody.a.x * dt;
-            rigidbody.v.y += rigidbody.a.y * dt;
-
-            // integrate position
-            transform.pos.x += rigidbody.v.x * dt;
-            transform.pos.y += rigidbody.v.y * dt;
-
-            // reset acceleration (forces are re-applied each frame)
-            rigidbody.a = {.x=0, .y=0};
-        }
     }
 
+
   private:
+    ComponentArray<Transform2>& transforms;
+    ComponentArray<RigidBody2>& rigidbodies;
+    ComponentArray<Gravity2>&   gravities;
+
     static auto make_signature() -> Signature
     {
         Signature sig{};
