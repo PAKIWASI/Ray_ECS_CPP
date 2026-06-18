@@ -1,9 +1,10 @@
 #include "ecs.hpp"
 #include "raylib.h"
-#include "components.hpp"
+#include "2d_comps.hpp"
 #include "physics_system.hpp"
 #include "render_system.hpp"
 #include "wasi.hpp"
+#include "component_list.hpp"
 
 using namespace wasi;
 using namespace ECS_COMPS_2D;

@@ -2,7 +2,7 @@
 #pragma once
 
 #include "ecs.hpp"
-#include "components.hpp"
+#include "2d_comps.hpp"
 
 using namespace ECS_COMPS_2D;
 

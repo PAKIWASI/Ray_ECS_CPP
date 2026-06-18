@@ -1,5 +1,5 @@
 #include "ecs.hpp"
-#include "components.hpp"
+#include "2d_comps.hpp"
 #include <raylib.h>
 
 using namespace ECS_COMPS_2D;
