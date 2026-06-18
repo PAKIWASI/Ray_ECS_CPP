@@ -25,6 +25,8 @@
             SystemManager    system_manager {};
         }
 
+    user can add their own components and systems in game_registry.hpp
+    they can also use library provided components and systems, just add them to the list
 */
 
 class World
