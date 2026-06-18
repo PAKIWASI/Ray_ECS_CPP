@@ -1,7 +1,6 @@
 #pragma once
 
 #include "common.hpp"
-#include "render_system.hpp"
 #include "wasi.hpp"
 
 using namespace wasi;
@@ -12,13 +11,10 @@ struct SystemList {
     static constexpr u8 count = sizeof...(Ts);
 };
 
-
 class PhysicsSystem;
-class RenderSystem;
 
 using Systems = SystemList<
-    PhysicsSystem,  // ID 0
-    RenderSystem    // ID 1
+    PhysicsSystem  // ID 0
 >;
 
 
@@ -32,7 +28,7 @@ struct sys_type_index<T, SystemList<Ts...>>
     static constexpr u8 value = []() consteval -> u8 {
         constexpr bool matches[] { std::is_same_v<T, Ts>... };
 
-        for (u8 i = 0; i < Systems::count; ++i) {
+        for (u8 i = 0; i < sizeof...(Ts); ++i) {
             if (matches[i]) { return i; }
         }
 
@@ -45,6 +41,5 @@ constexpr SystemType system_id = sys_type_index<T, Systems>::value;
 
 
 static_assert(system_id<PhysicsSystem> == 0, "PhysicsSystem id wrong!");
-static_assert(system_id<RenderSystem>  == 1, "RenderSystem id wrong!");
 
 

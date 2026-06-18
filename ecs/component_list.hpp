@@ -48,12 +48,13 @@ struct comp_type_index<T, ComponentList<Ts...>>  // we passed this as List
         constexpr bool matches[] { std::is_same_v<T, Ts>... };
 
         // loop to find the index which is true, should be exactly one
-        for (u8 i = 0; i < Components::count; ++i) {
+        for (u8 i = 0; i < sizeof...(Ts); ++i) {
             if (matches[i]) { return i; }
         }
         // if T is not in the list, hard error at compile time
         // static assert inside lambda is C++23
         // static_assert(false, "Component type is not registered in ComponentList");
+        // []<bool flag = false>() -> auto { static_assert(flag, "Component not in list"); }();
         return std::numeric_limits<u8>::max();  // backup for now
     }();
 };

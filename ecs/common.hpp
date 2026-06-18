@@ -53,25 +53,4 @@ template <typename T>
 concept ComponentType_t = std::default_initializable<T> // each comp arr is pre-initialized
                        && std::movable<T>;              // we move data into the arr
 
-// what counts as a system
-// each system MUST have:
-//  - an update(dt) method
-//  - an array of entities it operates on
-//  - a signature computed at compile time
-//  - easy access to the components it needs
-// If w can enforce these requirements at compile time, then we dont need
-// an oop hierarchy and inheritance
-template <typename T>
-concept SystemType_t = requires(T system, float dt) {
-    // Must have an update method that takes float
-    { system.update(dt) } -> std::same_as<void>;
-
-    // Must have a static constexpr signature member
-    requires requires {
-        { T::signature } -> std::convertible_to<Signature>;
-    };
-
-    // Must be default constructible (or we can require a specific constructor)
-    std::default_initializable<T>;
-};
 
