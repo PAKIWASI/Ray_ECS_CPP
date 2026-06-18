@@ -4,7 +4,6 @@
 namespace ECS_COMPS_2D
 {
 
-
 struct Vec2 {
     float x, y;
 };

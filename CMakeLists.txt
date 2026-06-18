@@ -50,6 +50,8 @@ add_executable(main
 target_include_directories(main PRIVATE
     include
     ecs
+    ecs/components
+    ecs/systems
     ${RAYLIB_INCLUDE_DIR}
 )
 
