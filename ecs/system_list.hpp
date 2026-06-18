@@ -1,7 +1,6 @@
 #pragma once
 
 #include "common.hpp"
-#include "physics_system.hpp"
 #include "render_system.hpp"
 #include "wasi.hpp"
 
@@ -13,6 +12,9 @@ struct SystemList {
     static constexpr u8 count = sizeof...(Ts);
 };
 
+
+class PhysicsSystem;
+class RenderSystem;
 
 using Systems = SystemList<
     PhysicsSystem,  // ID 0
@@ -43,6 +45,6 @@ constexpr SystemType system_id = sys_type_index<T, Systems>::value;
 
 
 static_assert(system_id<PhysicsSystem> == 0, "PhysicsSystem id wrong!");
-static_assert(system_id<RenderSystem>  == 1, "PhysicsSystem id wrong!");
+static_assert(system_id<RenderSystem>  == 1, "RenderSystem id wrong!");
 
 

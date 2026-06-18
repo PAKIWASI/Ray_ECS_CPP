@@ -2,17 +2,17 @@
 
 #include "common.hpp"
 #include "component_manager.hpp"
+#include "system_list.hpp"
 #include <bitset>
 #include <cassert>
-#include <limits>
 #include <vector>
 
 
 // Helper to compute system signature from component list
-template <typename... Components>
+template <typename... Ts>
 consteval auto make_signature() -> Signature {
     Signature sig;
-    ((sig.set(component_id<Components>)), ...);
+    ((sig.set(component_id<Ts>)), ...);
     return sig;
 }
 
@@ -186,7 +186,7 @@ public:
     
     // Get entity count for a system
     template <typename T>
-    size_t get_entity_count() const {
+    [[nodiscard]] auto get_entity_count() const -> u32 {
         return std::get<T>(systems).get_entities().size();
     }
 
@@ -199,6 +199,7 @@ private:
     }
 };
 
+
 // Alias
 template <typename List>
 struct make_system_manager;
@@ -209,3 +210,6 @@ struct make_system_manager<SystemList<Ts...>> {
 };
 
 using SystemManager = make_system_manager<Systems>::type;
+
+
+

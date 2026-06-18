@@ -4,6 +4,7 @@
 #include "system_manager.hpp"
 #include "2d_comps.hpp"
 
+
 class PhysicsSystem : public SystemBase<PhysicsSystem, Transform2, RigidBody2, Gravity2>
 {
 public:
@@ -15,7 +16,7 @@ public:
     void update_impl(float dt) {
         
         // Direct access - no references stored, just compile-time lookup
-        for (Entity e : entities)
+        for (Entity e : dense)
         {
             auto& transform = get_component<Transform2>(e);
             auto& rb = get_component<RigidBody2>(e);

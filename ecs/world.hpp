@@ -14,7 +14,7 @@ public:
     World() = default;
     
     // Entity API
-    Entity create_entity(Signature sig = 0) {
+    auto create_entity(Signature sig = 0) -> Entity {
         return entity_manager.create(sig);
     }
     
