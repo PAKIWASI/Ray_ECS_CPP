@@ -1,2 +1,10 @@
-#include "system_manager_inst.hpp"
-#include "component_manager.hpp"
+#include "world.hpp"
+
+
+
+auto main() -> int
+{
+    World world {};
+
+    return 0;
+}

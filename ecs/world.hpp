@@ -14,10 +14,6 @@ class World
 
   public:
 
-    World() {
-
-    }
-
     [[nodiscard]] auto create_entity(Signature sig = 0) -> Entity
     {
         return entity_manager.create(sig);
