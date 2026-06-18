@@ -7,10 +7,6 @@
 #include "system_manager.hpp"
 #include "archetype.hpp"
 
-// TODO: how to incorporate into world:
-// 1. archtypes
-// 2. compile time make_schedule
-// 3. other stuff
 
 
 class World

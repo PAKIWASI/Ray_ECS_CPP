@@ -5,6 +5,7 @@
 #include "2d_comps.hpp"
 
 
+// TODO: not have a general Physics system, divide into movement, etc etc
 class PhysicsSystem : public SystemBase<PhysicsSystem, Transform2, RigidBody2, Gravity2>
 {
 public:
@@ -35,6 +36,8 @@ public:
     // Instead of iterating `dense` (the entity list) and doing a lookup per component,
     // drive the loop from the smallest component array directly. For `PhysicsSystem`
     // that's `Gravity2` (fewest entities will have it)
+    // there is some cool maths and stats behind this appraoch
+    // what was it called again?
     void update_impl(float dt)
     {
         auto& gravities    = comp_manager.get_arr<Gravity2>();
