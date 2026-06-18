@@ -18,16 +18,17 @@ class SystemManagerImpl
 
     // Constructor takes ComponentManager and initializes all systems
     SystemManagerImpl(ComponentManager& cm)
-        : systems(create_systems<Systems...>(cm))
+        // : systems(create_systems<Systems...>(cm))
+        : systems(Systems(cm)...)
     {}
 
-    // Helper to create all systems with ComponentManager
-    template <typename... Sys>
-    static auto create_systems(ComponentManager& cm)
-    {
-        // Create each system with the ComponentManager reference
-        return std::tuple<Sys...>(Sys(cm)...);
-    }
+    // // Helper to create all systems with ComponentManager
+    // template <typename... Sys>
+    // static auto create_systems(ComponentManager& cm)
+    // {
+    //     // Create each system with the ComponentManager reference
+    //     return std::tuple<Sys...>(Sys(cm)...);
+    // }
 
     // Get system by type - compile-time lookup
     template <typename T>

@@ -61,8 +61,8 @@ class SystemBase
     static constexpr Signature signature = make_signature<ComponentTypes...>();
 
   public:
-    SystemBase(const SystemBase&)                    = delete;
-    SystemBase(SystemBase&&)                         = delete;
+    // SystemBase(const SystemBase&)                    = delete;
+    // SystemBase(SystemBase&&)                         = delete;
     auto operator=(const SystemBase&) -> SystemBase& = delete;
     auto operator=(SystemBase&&) -> SystemBase&      = delete;
 
@@ -72,6 +72,19 @@ class SystemBase
         dense.reserve(PRE_INIT_SIZE);
         sparse.fill(INVALID);
     }
+
+    SystemBase(SystemBase& other) noexcept
+        : comp_manager(other.comp_manager)
+        , dense(std::move(other.dense))
+        , sparse(other.sparse)
+    {}
+
+    // move constructor
+    SystemBase(SystemBase&& other) noexcept
+        : comp_manager(other.comp_manager)
+        , dense(std::move(other.dense))
+        , sparse(other.sparse)
+    {}
 
     // No virtual destructor - zero overhead
     ~SystemBase() = default;
