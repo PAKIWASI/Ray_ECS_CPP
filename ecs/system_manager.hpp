@@ -17,22 +17,24 @@ class SystemManagerImpl
   public:
 
     // Constructor takes ComponentManager and initializes all systems
-    SystemManagerImpl(const ComponentManager& cm)
+    SystemManagerImpl(ComponentManager& cm)
         : systems(create_systems<Systems...>(cm))
     {}
 
     // Helper to create all systems with ComponentManager
     template <typename... Sys>
-    static auto create_systems(const ComponentManager& cm)
+    static auto create_systems(ComponentManager& cm)
     {
         // Create each system with the ComponentManager reference
         return std::tuple<Sys...>(Sys(cm)...);
     }
 
     // Get system by type - compile-time lookup
-    template <typename T> [[nodiscard]] auto get_system() -> T& { return std::get<T>(systems); }
+    template <typename T>
+    [[nodiscard]] auto get_system() -> T& { return std::get<T>(systems); }
 
-    template <typename T> [[nodiscard]] auto get_system() const -> const T& { return std::get<T>(systems); }
+    template <typename T>
+    [[nodiscard]] auto get_system() const -> const T& { return std::get<T>(systems); }
 
     // Handle entity signature changes
     void on_signature_change(Entity e, Signature new_sig)
@@ -58,10 +60,11 @@ class SystemManagerImpl
     }
 
     // Update specific system - direct call
-    template <typename T> void update_system(float dt) { std::get<T>(systems).update_impl(dt); }
+    template <typename T>
+    void update_system(float dt) { std::get<T>(systems).update_impl(dt); }
 
     // Get entity count for a system
-    template <typename T> 
+    template <typename T>
     [[nodiscard]] auto get_entity_count() const -> u32
     {
         return std::get<T>(systems).get_entity_count();

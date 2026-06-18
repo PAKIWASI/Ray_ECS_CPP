@@ -11,13 +11,14 @@ public:
     using Base = SystemBase<PhysicsSystem, Transform2, RigidBody2, Gravity2>;
 
     // Constructor with ComponentManager
-    explicit PhysicsSystem(const ComponentManager& cm) : Base(cm) {}
+    explicit PhysicsSystem(ComponentManager& cm) : Base(cm) {}
 
     void update_impl(float dt) {
 
         // Direct access - no references stored, just compile-time lookup
-        for (Entity e : dense)
+        for (u32 i = 0; i < count; ++i)
         {
+            Entity e = dense[i];
             auto& transform = get_component<Transform2>(e);
             auto& rb = get_component<RigidBody2>(e);
             auto& gravity = get_component<Gravity2>(e);

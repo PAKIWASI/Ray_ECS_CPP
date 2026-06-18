@@ -34,7 +34,7 @@ concept SystemType_t = requires(T& system, const T& csystem, float dt) {
     // 4. Must be constructible from a ComponentManager (this is how systems
     //    get "easy access to the components it needs" — via comp_manager,
     //    not via a default constructor, which is deliberately NOT required)
-    requires std::constructible_from<T, const ComponentManager&>;
+    requires std::constructible_from<T, ComponentManager&>;
 };
 
 // Helper to compute system signature from component list
@@ -59,7 +59,7 @@ class SystemBase
 
     // Pointer to ComponentManager - single runtime indirection
     // This is the ONLY runtime data we need
-    const ComponentManager& comp_manager;
+    ComponentManager& comp_manager;
 
     // Computed signature at compile time
     static constexpr Signature signature = make_signature<ComponentTypes...>();
@@ -71,7 +71,7 @@ class SystemBase
     auto operator=(SystemBase&&) -> SystemBase&      = delete;
 
     // Constructor with ComponentManager
-    SystemBase(const ComponentManager& cm) : comp_manager(cm)
+    SystemBase(ComponentManager& cm) : comp_manager(cm)
     {
         dense.reserve(PRE_INIT_SIZE);
         sparse.fill(INVALID);
@@ -138,11 +138,11 @@ class SystemBase
         return comp_manager.get_arr<T>().get_data(e);
     }
 
-    template <typename T>
-    [[nodiscard]] auto get_component(Entity e) const -> const T&
-    {
-        return comp_manager.get_arr<T>().get_data(e);
-    }
+    // template <typename T>
+    // [[nodiscard]] auto get_component(Entity e) const -> const T&
+    // {
+    //     return comp_manager.get_arr<T>().get_data(e);
+    // }
 
     template <typename T>
     [[nodiscard]] auto has_component(Entity e) const -> bool
