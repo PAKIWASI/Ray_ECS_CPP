@@ -18,11 +18,9 @@ class ComponentArray
 {
   private:
     // sentinal value indicating ith entity has no data in this array
-    static constexpr u32 INVALID = std::numeric_limits<u32>::max();
-
     std::vector<T>      data;           // actual data - we have `active_entities` valid slots
     std::vector<Entity> idx_to_entity;  // maps data's slot index to what entity owns it
-    std::array<u32, MAX_ENTITIES> entity_to_idx{}; // maps which entity owns what slot index
+    std::array<Entity, MAX_ENTITIES> entity_to_idx{}; // maps which entity owns what slot index
 
   public:
 
@@ -107,14 +105,15 @@ class ComponentManagerImpl
 
     // this no longer needs virtual dispatch
     // the fold expression explands to one call per array, all inlined
-    void entity_destroyed(Entity e)
+    void entity_destroyed(Entity e, Signature sig)
     {
         // std::apply applies a function to each element of a tuple
         //  auto&... is a pack of references to each tuple element
         //  each arr is a different type (ComponentArray<T1>, ComponentArray<T2> etc.)
         std::apply([&](auto&... arr) constexpr -> void {
             // this fold expression is called on each arr unpacked
-            (arr.remove_if_present(e), ...);    // right fold on comma
+            u8 idx = 0; // TODO: now we do this
+            ((sig.test(idx++) ? arr.remove_data(e) : void()), ...);    // right fold on comma
             // if tuple = {ComponentArray<T1>, ComponentArray<T2>}
             // then args passed to function: func(ComponentArray<T1>&, ComponentArray<T2>&)
             // expands to:
