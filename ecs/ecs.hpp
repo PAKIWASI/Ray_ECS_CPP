@@ -21,6 +21,8 @@ using namespace wasi;
 
 
 
+namespace OLD_ECS {
+
 
 // Entity Manager
 // ===============
@@ -125,9 +127,6 @@ struct ICompArr
     // and needs to call something through the base pointer without knowing T
     virtual void entity_destroyed(Entity e)      = 0;       // another vtable entry
 };
-
-
-
 
 // Templated subclass, this is the type scpecif ComponentArray<T>
 // The concept check happens here for each T
@@ -490,3 +489,4 @@ class World
 };
 
 
+}

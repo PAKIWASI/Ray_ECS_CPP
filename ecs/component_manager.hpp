@@ -1,30 +1,45 @@
 #pragma once
 
-
 // With Compile time IDs from component_list.hpp, we can initiate all
 // arrays in ComponentManager's constructor by folding over type list
 // no manual registration calls and no runtime polymorphism needed
 
-
-
 #include "common.hpp"
+#include "component_list.hpp"
+
+#include <tuple>
 #include <cassert>
 #include <vector>
+#include <array>
+
+
 template <ComponentType_t T>
-class ComponentArray {
+class N_ComponentArray
+{
   private:
     // sentinal value indicating ith entity has no data in this array
     static constexpr u32 INVALID = std::numeric_limits<u32>::max();
 
     std::vector<T>      data;           // actual data - we have `active_entities` valid slots
     std::vector<Entity> idx_to_entity;  // maps data's slot index to what entity owns it
-    std::array<u32, MAX_ENTITIES> entity_to_idx; // maps which entity owns what slot index
+    std::array<u32, MAX_ENTITIES> entity_to_idx{}; // maps which entity owns what slot index
 
   public:
 
-    auto has_data(Entity e) -> bool
+    N_ComponentArray() {
+        data.reserve(PRE_INIT_SIZE);
+        idx_to_entity.reserve(PRE_INIT_SIZE);
+        entity_to_idx.fill(INVALID);
+    }
+
+    void add_data(Entity e, T comp) // simple T comp allows rvalues and lvalues alike
     {
-        return entity_to_idx[e] != INVALID;
+        assert(e < MAX_ENTITIES && "Entity out of range");
+        assert(entity_to_idx[e] == INVALID && "Entity already has component");
+
+        entity_to_idx[e] = data.size();
+        idx_to_entity.emplace_back(e);
+        data.emplace_back(std::move(comp));
     }
 
     void remove_data(Entity e)
@@ -47,29 +62,43 @@ class ComponentArray {
         idx_to_entity.pop_back();
     }
 
+    [[nodiscard]] auto get_data(Entity e) -> T&
+    {
+        assert(e < MAX_ENTITIES && "Entity out of range");
+        u32 idx = entity_to_idx[e];
+        assert(idx != INVALID && "Entity does not have component");
+        return data[idx];
+    }
+
+    auto has_data(Entity e) -> bool
+    {
+        return entity_to_idx[e] != INVALID;
+    }
+
     // add a safe version for the fold expression in entity_destroyed
+    // entity_destroyed calls this function on every ComponentArray, even if e doesn't have that component
+    // raw remove_data(e) would hit a runtime assert, so we first do a cheap lookup
     void remove_if_present(Entity e) {
         if (has_data(e)) { remove_data(e); }
     }
 };
 
 // Helper to construct ComponentManager from a ComponentList
-#include <tuple>
 template <typename... Ts>
 class ComponentManagerImpl
 {
   private:
     // Each ComponentArray<T> lives directly inline in this tuple
     // [ComponentArray<T1> | ComponentArray<T2> | ComponentArray<T3> ...]
-    std::tuple<ComponentArray<Ts>...> arrays;
+    std::tuple<N_ComponentArray<Ts>...> arrays;
   public:
 
     template <typename T>
-    consteval auto get_arr() -> ComponentArray<T>& 
+    consteval auto get_arr() -> N_ComponentArray<T>& 
     {
         // std::get finds an element of a tuple at compile time
         // from it's type if all elements have unique types
-        return std::get<ComponentArray<T>>(arrays);
+        return std::get<N_ComponentArray<T>>(arrays);
     }
 
     // this no longer needs virtual dispatch
@@ -79,7 +108,7 @@ class ComponentManagerImpl
         // std::apply applies a function to each element of a tuple
         //  auto&... is a pack of references to each tuple element
         //  each arr is a different type (ComponentArray<T1>, ComponentArray<T2> etc.)
-        std::apply([&](auto&... arr) consteval -> void {
+        std::apply([&](auto&... arr) constexpr -> void {
             // this fold expression is called on each arr unpacked
             (arr.remove_if_present(e), ...);    // right fold on comma
             // if tuple = {ComponentArray<T1>, ComponentArray<T2>}
@@ -90,3 +119,20 @@ class ComponentManagerImpl
         }, arrays);
     }
 };
+
+
+// Alias using our canonical list
+// Unpack ComponentList<Ts...> into ComponentManagerImpl<Ts...>
+template <typename List>
+struct make_component_manager;
+
+// same partial specialization pattern
+template <typename... Ts>
+struct make_component_manager<ComponentList<Ts...>> {
+    using type = ComponentManagerImpl<Ts...>;
+};
+
+using N_ComponentManager = make_component_manager<Components>::type;
+
+
+
