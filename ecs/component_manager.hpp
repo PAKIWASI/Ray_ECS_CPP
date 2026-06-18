@@ -14,7 +14,7 @@
 
 
 template <ComponentType_t T>
-class N_ComponentArray
+class ComponentArray
 {
   private:
     // sentinal value indicating ith entity has no data in this array
@@ -26,7 +26,7 @@ class N_ComponentArray
 
   public:
 
-    N_ComponentArray() {
+    ComponentArray() {
         data.reserve(PRE_INIT_SIZE);
         idx_to_entity.reserve(PRE_INIT_SIZE);
         entity_to_idx.fill(INVALID);
@@ -90,15 +90,19 @@ class ComponentManagerImpl
   private:
     // Each ComponentArray<T> lives directly inline in this tuple
     // [ComponentArray<T1> | ComponentArray<T2> | ComponentArray<T3> ...]
-    std::tuple<N_ComponentArray<Ts>...> arrays;
+    std::tuple<ComponentArray<Ts>...> arrays;
   public:
 
+    // this function is can't be consteval
+    // consteval controls whether the expression `cm.get_arr<T>()` is usable
+    // in a context demanding compile time execution, which it is not as cm is
+    // a runtime variable
     template <typename T>
-    consteval auto get_arr() -> N_ComponentArray<T>& 
+    auto get_arr() -> ComponentArray<T>&
     {
         // std::get finds an element of a tuple at compile time
         // from it's type if all elements have unique types
-        return std::get<N_ComponentArray<T>>(arrays);
+        return std::get<ComponentArray<T>>(arrays);
     }
 
     // this no longer needs virtual dispatch
@@ -132,7 +136,12 @@ struct make_component_manager<ComponentList<Ts...>> {
     using type = ComponentManagerImpl<Ts...>;
 };
 
-using N_ComponentManager = make_component_manager<Components>::type;
+using ComponentManager = make_component_manager<Components>::type;
 
+// we can do:
+//      ComponentManager cm {};
+//      ComponentArray<Transform2> t_arr = cm.get_arr<Transform2>();
+//      Transform& t = t_arr.get_data(e);
+//  only two direct memory accesses
 
 

@@ -34,11 +34,11 @@ using Components = ComponentList<
 
 // first we do forward declaration without defining struct
 template <typename T, typename List>
-struct type_index;
+struct comp_type_index;
 
 // partial specilization: this def is used when we pass ComponentList<Ts...> as List
 template <typename T, typename... Ts>       // whatever passed, first is T and rest are Ts...
-struct type_index<T, ComponentList<Ts...>>  // we passed this as List
+struct comp_type_index<T, ComponentList<Ts...>>  // we passed this as List
 {
     // static constexpr member var, computed at compile time
     // using a constexpr lambda, enabling us to use loops at compile time
@@ -60,7 +60,7 @@ struct type_index<T, ComponentList<Ts...>>  // we passed this as List
 
 // Convenient alias
 template  <typename T>
-constexpr ComponentType component_id = type_index<T, Components>::value;
+constexpr ComponentType component_id = comp_type_index<T, Components>::value;
 
 // final test: have to do this 'cause the stupid fucking static_assert(false) is not working
 static_assert(component_id<Transform2> == 0, "Transform2 id wrong!");

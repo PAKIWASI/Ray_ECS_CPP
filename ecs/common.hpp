@@ -2,6 +2,7 @@
 
 #include "wasi.hpp"
 #include <bitset>
+#include <concepts>
 
 using namespace wasi;
 
@@ -46,10 +47,13 @@ using Schedule      = std::bitset<MAX_SYSTEMS>;
 
 
 
-// Concept: what counts as a component
+// what counts as a component
 template <typename T>
 concept ComponentType_t = std::default_initializable<T> // each comp arr is pre-initialized
                        && std::movable<T>;              // we move data into the arr
 
-
+// TODO:
+// what counts as a system
+template <typename T>
+concept SystemType_t = std::default_initializable<T>;
 
