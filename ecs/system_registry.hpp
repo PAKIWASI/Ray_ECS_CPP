@@ -5,7 +5,7 @@
 #include "physics_system.hpp"
 
 
-template <typename... Ts>
+template <SystemType_t... Ts>
 struct SystemList {
     static constexpr u8 count = sizeof...(Ts);
 };

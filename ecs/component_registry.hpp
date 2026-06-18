@@ -15,7 +15,7 @@ using namespace wasi;
 // Takes list of Component types as a pack and saves a compile time
 // count, it also has pack info embedded, which we will extract
 // TODO: should  we requre the concept here? ComponentType_t instead of typename?
-template <typename... Ts>
+template <ComponentType_t... Ts>
 struct ComponentList {
     static constexpr u8 count = sizeof...(Ts);
 };

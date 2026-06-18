@@ -39,7 +39,7 @@ class World
     // TODO: understand archtype init
 
     // Overload 1: default-constructed
-    template <typename A>   // TODO: define concept for archetype, we dont have lsp support
+    template <ArchetypeType_t A>
     [[nodiscard]] auto create_from_archetype() -> Entity
     {
         Entity e = entity_manager.create();
@@ -51,8 +51,8 @@ class World
         return e;
     }
 
-    // Overload 2: caller supplied values
-    template <typename A, typename... Args>  // TODO: why not by refernece ?
+    // Overload 2: caller supplied component values
+    template <ArchetypeType_t A, typename... Args>
     [[nodiscard]] auto create_from_archetype(Args&&... args) -> Entity
     {
         Entity e = entity_manager.create();
@@ -97,4 +97,5 @@ static consteval auto make_schedule() -> Schedule {
 
 // Usage:
 constexpr Schedule PHYSICS_ONLY = make_schedule<PhysicsSystem>();
+
 

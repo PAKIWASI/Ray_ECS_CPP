@@ -3,6 +3,12 @@
 #include "component_registry.hpp"
 
 
+template <typename T>
+concept ArchetypeType_t = requires {
+    T::size();
+    T::signature();
+};
+
 
 template <typename... Ts>
 struct Archetype
@@ -14,10 +20,12 @@ struct Archetype
         return sig;
     }
 
+    // TODO: understand
     // Helper to iterate over all component types in this archetype
     // Calls the provided lambda for each type T
     template <typename F>
-    static constexpr void for_each_type(F&& f) { // WARN: Forwarding reference parameter 'f' is never forwarded inside the function body
+    static constexpr void for_each_type(F f)
+    {
         (f.template operator()<Ts>(), ...);
     }
 

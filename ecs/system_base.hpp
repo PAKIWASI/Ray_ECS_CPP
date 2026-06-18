@@ -118,7 +118,6 @@ class SystemBase
         dense[idx]          = last_entity;
         sparse[last_entity] = idx;
         dense.pop_back();           // size--
-        // TODO: is this correct?
 
         // Remove
         sparse[e] = INVALID;
