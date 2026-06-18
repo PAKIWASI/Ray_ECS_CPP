@@ -1,6 +1,7 @@
 #pragma once
 
 #include "common.hpp"
+
 #include <cassert>
 #include <vector>
 #include <array>

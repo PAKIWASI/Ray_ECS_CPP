@@ -1,7 +1,7 @@
 #pragma once
 
 #include "system_base.hpp"
-#include "system_list.hpp"
+#include "system_registry.hpp"
 
 
 template <SystemType_t... Systems>
@@ -87,5 +87,24 @@ class SystemManagerImpl
         else if (!qualifies &&  has) { sys.remove_entity(e); }
     }
 };
+
+
+// partial specilization pattern
+template <typename List>
+struct make_system_manager;
+
+template <SystemType_t... Ts>
+struct make_system_manager<SystemList<Ts...>> {
+    using type = SystemManagerImpl<Ts...>;
+};
+
+
+// final alias
+using SystemManager = make_system_manager<Systems>::type;
+
+// Static asserts now work because PhysicsSystem and RenderSystem are fully defined
+static_assert(SystemType_t<PhysicsSystem>, "PhysicsSystem does not satisfy SystemType_t");
+// static_assert(SystemType_t<RenderSystem>,  "RenderSystem does not satisfy SystemType_t");
+
 
 

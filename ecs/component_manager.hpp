@@ -4,8 +4,7 @@
 // arrays in ComponentManager's constructor by folding over type list
 // no manual registration calls and no runtime polymorphism needed
 
-#include "common.hpp"
-#include "component_list.hpp"
+#include "component_registery.hpp"
 
 #include <tuple>
 #include <cassert>
@@ -120,6 +119,8 @@ class ComponentManagerImpl
         }, arrays);
     }
 };
+
+// TODO: move ?
 
 
 // Alias using our canonical list

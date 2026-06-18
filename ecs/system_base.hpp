@@ -1,7 +1,7 @@
 #pragma once
 
-#include "common.hpp"
 #include "component_manager.hpp"
+
 #include <bitset>
 #include <cassert>
 #include <vector>
@@ -32,6 +32,7 @@ concept SystemType_t = requires(T& system, const T& csystem, float dt) {
     //    get "easy access to the components it needs" — via comp_manager
     requires std::constructible_from<T, ComponentManager&>;
 };
+
 
 // Helper to compute system signature from component list
 template <typename... Ts>

@@ -1,9 +1,8 @@
 #pragma once
 
 #include "common.hpp"
-#include "wasi.hpp"
 
-using namespace wasi;
+#include "physics_system.hpp"
 
 
 template <typename... Ts>
@@ -11,8 +10,9 @@ struct SystemList {
     static constexpr u8 count = sizeof...(Ts);
 };
 
-class PhysicsSystem;
 
+// single source of truth for all systems resolved at compile time
+// the position in array is the id/index
 using Systems = SystemList<
     PhysicsSystem  // ID 0
 >;
@@ -31,11 +31,13 @@ struct sys_type_index<T, SystemList<Ts...>>
         for (u8 i = 0; i < sizeof...(Ts); ++i) {
             if (matches[i]) { return i; }
         }
-
+        // static_assert(false, "Type is not in SystemList");
+        // work around for static_assert(false) not working
         return std::numeric_limits<u8>::max();
     }();
 };
 
+// final alias
 template <typename T>
 constexpr SystemType system_id = sys_type_index<T, Systems>::value;
 

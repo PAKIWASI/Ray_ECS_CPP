@@ -2,7 +2,7 @@
 
 #include "component_manager.hpp"
 #include "entity_manager.hpp"
-#include "system_manager_inst.hpp"
+#include "system_manager.hpp"
 
 
 class World

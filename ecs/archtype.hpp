@@ -1,6 +1,6 @@
 #pragma once
 
-#include "component_list.hpp"
+#include "component_registery.hpp"
 
 
 
@@ -34,3 +34,6 @@ struct Archetype
 // Named archetypes — define all entity templates here
 using PlayerArchetype   = Archetype<Transform2, RigidBody2>;
 //...
+
+
+
