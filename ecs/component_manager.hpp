@@ -72,9 +72,17 @@ class ComponentArray
         return data[idx];
     }
 
-    auto has_data(Entity e) -> bool
+    [[nodiscard]] auto has_data(Entity e) -> bool
     {
         return entity_to_idx[e] != INVALID;
+    }
+
+    [[nodiscard]] auto entity_count() -> u32 { return data.size(); }
+
+    [[nodiscard]] auto entity_at(u32 idx) -> Entity
+    {
+        assert(idx < data.size() && "index out of range");
+        return idx_to_entity[idx];
     }
 
     // add a safe version for the fold expression in entity_destroyed

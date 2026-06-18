@@ -1,8 +1,15 @@
 #pragma once
 
+#include "common.hpp"
 #include "component_manager.hpp"
+#include "component_registery.hpp"
 #include "entity_manager.hpp"
 #include "system_manager.hpp"
+
+// TODO: how to incorporate into world:
+// 1. archtypes
+// 2. compile time make_schedule
+// 3. other stuff
 
 
 class World
@@ -21,35 +28,34 @@ class World
 
     void destroy_entity(Entity e)
     {
+        // order matters here
         // systems and components must clean up before the id is recycled
         system_manager.    on_entity_destroyed(e);
         component_manager. entity_destroyed(e);
         entity_manager.    destroy(e);
     }
 
-    // TODO:
-    // Overload 1: default-constructed components
-    // Useful for pooled entities that will have their data set after creation
+    // TODO: understand archtype init
+
+    // Overload 1: default-constructed
     template <typename A>
-    auto create_from_archetype() -> Entity {
+    [[nodiscard]] auto create_from_archtype() -> Entity
+    {
         Entity e = entity_manager.create();
-        // fold: calls add_component for each T in A's pack
-        // A must expose its Ts... — see ArchetypeImpl below
-        // TODO: What is this ??
         A::for_each_type([&]<typename T>() -> void {
-            add_component<T>(e, T{});
+            component_manager.get_arr<T>().add_data(e, T{});
+            entity_manager.set_component(e, component_id<T>);
         });
+        system_manager.on_signature_change(e, entity_manager.get_signature(e));
         return e;
     }
 
-    // TODO:
-    // Overload 2: caller supplies initial component values
-    // Args must match the archetype's component types IN ORDER
-    template <typename A, typename... Args>
-    auto create_from_archetype(Args&&... args) -> Entity {
+    // Overload 2: caller supplied values
+    template <typename A, typename... Args>  // TODO: why not by refernece ?
+    [[nodiscard]] auto create_from_archtype(Args&&... args) -> Entity 
+    {
         Entity e = entity_manager.create();
         (add_component(e, std::forward<Args>(args)), ...);
-        return e;
     }
 
     // Component API
@@ -58,12 +64,16 @@ class World
     void add_component(Entity e, T comp)
     {
         component_manager.get_arr<T>().add_data(e, std::move(comp));
+        entity_manager.set_component(e, component_id<T>);
+        system_manager.on_signature_change(e, entity_manager.get_signature(e));
     }
 
     template <ComponentType_t T>
     void remove_component(Entity e)
     {
         component_manager.get_arr<T>().remove_data(e);
+        entity_manager.unset_component(e, component_id<T>);
+        system_manager.on_signature_change(e, entity_manager.get_signature(e));
     }
 
     // System API
@@ -72,5 +82,17 @@ class World
     {
         system_manager.update(dt, schedule);
     }
-
 };
+
+
+// make a compile time schedule your systems
+template <typename... Ts>
+static consteval auto make_schedule() -> Schedule {
+    Schedule s{};
+    (s.set(system_id<Ts>), ...);
+    return s;
+}
+
+// Usage:
+constexpr Schedule PHYSICS_ONLY = make_schedule<PhysicsSystem>();
+

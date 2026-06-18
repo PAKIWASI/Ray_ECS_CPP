@@ -17,7 +17,7 @@ struct Archetype
     // Helper to iterate over all component types in this archetype
     // Calls the provided lambda for each type T
     template <typename F>
-    static constexpr void for_each_type(F& f) {
+    static constexpr void for_each_type(F&& f) { // WARN: Forwarding reference parameter 'f' is never forwarded inside the function body
         (f.template operator()<Ts>(), ...);
     }
 
@@ -31,9 +31,8 @@ struct Archetype
     static constexpr auto size() -> u8 { return sizeof...(Ts); }
 };
 
-// Named archetypes — define all entity templates here
+// usage:
 using PlayerArchetype   = Archetype<Transform2, RigidBody2>;
-//...
 
 
 
