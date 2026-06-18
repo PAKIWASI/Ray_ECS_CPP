@@ -2,7 +2,6 @@
 
 #include "wasi.hpp"
 
-#include <algorithm>
 #include <array>
 #include <bitset>
 #include <cassert>
@@ -82,16 +81,20 @@ class EntityManager
 
     [[nodiscard]] auto create(Signature sig = 0) -> Entity
     {
+        Entity chosen {};
         if (!free_ids.empty()) {
-            Entity recycled = free_ids.back();
+            chosen = free_ids.back();
             free_ids.pop_back();
-            return recycled;
+        } else {
+            assert(next_id < MAX_ENTITIES && "MAX_ENTITIES reached");
+            chosen = next_id++;
         }
-        assert(next_id < MAX_ENTITIES && "MAX_ENTITIES reached");
+
         if (sig != 0) {
-            signatures.at(next_id) = sig;
+            signatures.at(chosen) = sig;
         }
-        return next_id++;
+
+        return chosen;
     }
 
     void destroy(Entity e)
@@ -117,7 +120,7 @@ class EntityManager
         signatures.at(e).reset(c);
     }
 
-    auto has_component(Entity e, ComponentType c) -> bool
+    [[nodiscard]] auto has_component(Entity e, ComponentType c) const -> bool
     {
         assert(e < next_id && "Entity out of range");
         assert(c < MAX_COMPONENTS && "Component out of range");
@@ -178,7 +181,6 @@ class ComponentArray : public ICompArr  // class does private inheritace by defa
     std::vector<T>      data;           // actual data - we have `active_entities` valid slots
     std::vector<Entity> idx_to_entity;  // maps data's slot index to what entity owns it
     std::array<u32, MAX_ENTITIES> entity_to_idx{}; // maps which entity owns what slot index
-    u32 active_entities = 0;
 
 public:
     ComponentArray() {
@@ -192,10 +194,9 @@ public:
         assert(e < MAX_ENTITIES && "Entity out of range");
         assert(entity_to_idx[e] == INVALID && "Entity already has component");
 
-        entity_to_idx[e] = active_entities;
+        entity_to_idx[e] = data.size();
         idx_to_entity.emplace_back(e);
         data.emplace_back(std::move(comp));
-        active_entities++;
     }
 
     void remove_data(Entity e)
@@ -204,7 +205,7 @@ public:
         u32 idx = entity_to_idx[e];
         assert(idx != INVALID && "Entity does not have component");
 
-        u32 last_idx           = active_entities - 1;
+        u32 last_idx           = data.size() - 1;
         Entity last_entity     = idx_to_entity[last_idx];
 
         // swap
@@ -216,7 +217,6 @@ public:
         entity_to_idx[e]       = INVALID;
         data.pop_back();
         idx_to_entity.pop_back();
-        active_entities--;
     }
 
     [[nodiscard]] auto get_data(Entity e) -> T&
@@ -227,7 +227,11 @@ public:
         return data[idx];
     }
 
-    void entity_destroyed(Entity e) override { remove_data(e); }
+    void entity_destroyed(Entity e) override {
+        if (entity_to_idx[e] != INVALID) {
+            remove_data(e);
+        }
+    }
 };
 
 
@@ -364,7 +368,7 @@ class ISystem
         entities.erase(e);
     }
 
-    auto has_entity(Entity e) -> bool
+    [[nodiscard]] auto has_entity(Entity e) const -> bool
     {
         assert(e < MAX_ENTITIES && "Entity out of range");
         return entities.contains(e);
@@ -400,7 +404,7 @@ class SystemManager
     void register_system(Args&&... args)
     {
         SystemType id = get_system_id<T>();
-        assert(systems.at(id) == nullptr && "Component already registered");
+        assert(systems.at(id) == nullptr && "System already registered");
         // we store base class pointer but pass a derived class object pointer
         systems.at(id) = std::make_unique<T>(std::forward<Args>(args)...);  // preserves rvals and lvals
         // T needs to be default constructable but it' not, we need to pass a signature in the constructor
@@ -504,18 +508,6 @@ class World
         entity_manager->unset_component(e, ComponentManager::get_component_id<T>());
         system_manager->on_signature_change(e, entity_manager->get_signature(e));
     }
-
-    // template <ComponentType_t T>
-    // [[nodiscard]] auto get_component(Entity e) -> T&
-    // {
-    //     return component_manager->get_component<T>(e);
-    // }
-
-    // template <ComponentType_t T>
-    // [[nodiscard]] static auto get_component_id() -> ComponentType
-    // {
-    //     return ComponentManager::get_component_id<T>();
-    // }
 
     // System API
 
