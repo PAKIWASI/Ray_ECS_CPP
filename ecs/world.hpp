@@ -2,9 +2,10 @@
 
 #include "common.hpp"
 #include "component_manager.hpp"
-#include "component_registery.hpp"
+#include "component_registry.hpp"
 #include "entity_manager.hpp"
 #include "system_manager.hpp"
+#include "archetype.hpp"
 
 // TODO: how to incorporate into world:
 // 1. archtypes
@@ -38,8 +39,8 @@ class World
     // TODO: understand archtype init
 
     // Overload 1: default-constructed
-    template <typename A>
-    [[nodiscard]] auto create_from_archtype() -> Entity
+    template <typename A>   // TODO: define concept for archetype, we dont have lsp support
+    [[nodiscard]] auto create_from_archetype() -> Entity
     {
         Entity e = entity_manager.create();
         A::for_each_type([&]<typename T>() -> void {
@@ -52,10 +53,11 @@ class World
 
     // Overload 2: caller supplied values
     template <typename A, typename... Args>  // TODO: why not by refernece ?
-    [[nodiscard]] auto create_from_archtype(Args&&... args) -> Entity 
+    [[nodiscard]] auto create_from_archetype(Args&&... args) -> Entity
     {
         Entity e = entity_manager.create();
         (add_component(e, std::forward<Args>(args)), ...);
+        return e;
     }
 
     // Component API

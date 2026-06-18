@@ -4,7 +4,7 @@
 // arrays in ComponentManager's constructor by folding over type list
 // no manual registration calls and no runtime polymorphism needed
 
-#include "component_registery.hpp"
+#include "component_registry.hpp"
 
 #include <tuple>
 #include <cassert>
@@ -16,9 +16,6 @@ template <ComponentType_t T>
 class ComponentArray
 {
   private:
-    // TODO: this is a proper dense/sparse arr right?
-    // we just have an extra vector for reverse map
-
     // dense arr
     std::vector<T>      data;           // actual data - we have `active_entities` valid slots
     // for swap delete, we want to know which entity occupies last index in data
@@ -127,9 +124,6 @@ class ComponentManagerImpl
         }, arrays);
     }
 };
-
-// TODO: move ?
-
 
 // Alias using our canonical list
 // Unpack ComponentList<Ts...> into ComponentManagerImpl<Ts...>

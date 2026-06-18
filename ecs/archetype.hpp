@@ -1,6 +1,6 @@
 #pragma once
 
-#include "component_registery.hpp"
+#include "component_registry.hpp"
 
 
 

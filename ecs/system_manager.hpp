@@ -23,8 +23,7 @@ class SystemManagerImpl
 
     // Helper to create all systems with ComponentManager
     template <typename... Sys>
-    // TODO: made consteval
-    consteval static auto create_systems(ComponentManager& cm)
+    static auto create_systems(ComponentManager& cm)
     {
         // Create each system with the ComponentManager reference
         return std::tuple<Sys...>(Sys(cm)...);

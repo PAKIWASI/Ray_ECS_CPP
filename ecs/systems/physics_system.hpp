@@ -44,7 +44,7 @@ public:
         for (u32 i = 0; i < gravities.entity_count(); ++i)
         {
             Entity e      = gravities.entity_at(i);    // sequential — free
-            auto&  g      = gravities.get_data(i);      // sequential — free
+            auto&  g      = gravities.get_data(e);      // sequential — free
             auto&  rb     = rigidbodies.get_data(e);   // one random lookup
             auto&  t      = transforms.get_data(e);    // one random lookup
 
