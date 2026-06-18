@@ -6,10 +6,14 @@
 #include "2d_comps.hpp"
 #include "wasi.hpp"
 #include "common.hpp"
-#include <limits>
 
 using namespace ECS_COMPS_2D;
 using namespace wasi;
+
+// what counts as a component
+template <typename T>
+concept ComponentType_t = std::default_initializable<T> // each comp arr is pre-initialized
+                       && std::movable<T>;              // we move data into the arr
 
 
 // Takes list of Component types as a pack and saves a compile time

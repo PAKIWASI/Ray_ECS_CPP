@@ -24,16 +24,12 @@ concept SystemType_t = requires(T& system, const T& csystem, float dt) {
     { T::get_signature() } -> std::same_as<Signature>;
 
     // 3. Must expose its entity set for iteration
-    //    (matches SystemBase's add_entity/remove_entity/has_entity contract,
-    //     not a raw container type, since the dense/sparse layout is an
-    //     implementation detail systems shouldn't be required to expose)
     { system.add_entity(Entity{}) } -> std::same_as<void>;
     { system.remove_entity(Entity{}) } -> std::same_as<void>;
     { csystem.has_entity(Entity{}) } -> std::same_as<bool>;
 
     // 4. Must be constructible from a ComponentManager (this is how systems
-    //    get "easy access to the components it needs" — via comp_manager,
-    //    not via a default constructor, which is deliberately NOT required)
+    //    get "easy access to the components it needs" — via comp_manager
     requires std::constructible_from<T, ComponentManager&>;
 };
 
@@ -47,7 +43,7 @@ consteval auto make_signature() -> Signature
 }
 
 
-// CRTP base - no virtual functions, no vtable, no runtime references
+// CRTP base - no virtual functions, vtable, or runtime references
 template <typename Derived, typename... ComponentTypes>
 class SystemBase
 {
@@ -55,7 +51,6 @@ class SystemBase
     // Sparse set implementation
     std::vector<Entity>           dense;     // Contiguous entities for iteration
     std::array<u32, MAX_ENTITIES> sparse{};  // Maps entity -> index in dense
-    u32                           count = 0; // Number of entities in system
 
     // Pointer to ComponentManager - single runtime indirection
     // This is the ONLY runtime data we need
@@ -87,13 +82,13 @@ class SystemBase
         assert(e < MAX_ENTITIES && "Entity out of range");
         assert(!has_entity(e) && "Entity already in system");
 
+        size_t count = dense.size();
         sparse[e] = count;
         if (count >= dense.size()) {
-            dense.emplace_back(e);
+            dense.emplace_back(e);      // size++
         } else {
             dense[count] = e;
         }
-        count++;
     }
 
     void remove_entity(Entity e)
@@ -102,27 +97,28 @@ class SystemBase
         assert(has_entity(e) && "Entity not in system");
 
         u32    idx         = sparse[e];
-        u32    last_idx    = count - 1;
+        u32    last_idx    = dense.size() - 1;
         Entity last_entity = dense[last_idx];
 
         // Swap with last
         dense[idx]          = last_entity;
         sparse[last_entity] = idx;
+        dense.pop_back();           // size--
+        // TODO: is this correct?
 
         // Remove
         sparse[e] = INVALID;
-        count--;
     }
 
     [[nodiscard]] auto has_entity(Entity e) const -> bool
     {
         assert(e < MAX_ENTITIES && "Entity out of range");
-        return sparse[e] != INVALID && sparse[e] < count && dense[sparse[e]] == e;
+        return sparse[e] != INVALID && sparse[e] < dense.size() && dense[sparse[e]] == e;
     }
 
     [[nodiscard]] static constexpr auto get_signature() -> Signature { return signature; }
 
-    [[nodiscard]] auto get_entity_count() const -> u32 { return count; }
+    [[nodiscard]] auto get_entity_count() const -> u32 { return dense.size(); }
 
 
     // CRTP: Derived must implement update_impl
@@ -137,12 +133,6 @@ class SystemBase
         // The compiler resolves this to a direct memory access
         return comp_manager.get_arr<T>().get_data(e);
     }
-
-    // template <typename T>
-    // [[nodiscard]] auto get_component(Entity e) const -> const T&
-    // {
-    //     return comp_manager.get_arr<T>().get_data(e);
-    // }
 
     template <typename T>
     [[nodiscard]] auto has_component(Entity e) const -> bool

@@ -23,7 +23,8 @@ class SystemManagerImpl
 
     // Helper to create all systems with ComponentManager
     template <typename... Sys>
-    static auto create_systems(ComponentManager& cm)
+    // TODO: made consteval
+    consteval static auto create_systems(ComponentManager& cm)
     {
         // Create each system with the ComponentManager reference
         return std::tuple<Sys...>(Sys(cm)...);
@@ -33,13 +34,15 @@ class SystemManagerImpl
     template <typename T>
     [[nodiscard]] auto get_system() -> T& { return std::get<T>(systems); }
 
-    template <typename T>
-    [[nodiscard]] auto get_system() const -> const T& { return std::get<T>(systems); }
+    // template <typename T>
+    // [[nodiscard]] auto get_system() const -> const T& { return std::get<T>(systems); }
 
     // Handle entity signature changes
     void on_signature_change(Entity e, Signature new_sig)
     {
-        std::apply([&](auto&... sys) -> void { (check_and_add_entity(sys, e, new_sig), ...); }, systems);
+        std::apply([&](auto&... sys) -> void {
+            (check_and_update_entity(sys, e, new_sig), ...);
+        }, systems);
     }
 
     void on_entity_destroyed(Entity e)

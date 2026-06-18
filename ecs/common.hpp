@@ -48,9 +48,5 @@ using Schedule      = std::bitset<MAX_SYSTEMS>;
 static constexpr u32 INVALID = std::numeric_limits<u32>::max();
 
 
-// what counts as a component
-template <typename T>
-concept ComponentType_t = std::default_initializable<T> // each comp arr is pre-initialized
-                       && std::movable<T>;              // we move data into the arr
 
 

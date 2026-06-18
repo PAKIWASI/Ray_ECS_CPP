@@ -17,9 +17,14 @@ template <ComponentType_t T>
 class ComponentArray
 {
   private:
-    // sentinal value indicating ith entity has no data in this array
+    // TODO: this is a proper dense/sparse arr right?
+    // we just have an extra vector for reverse map
+
+    // dense arr
     std::vector<T>      data;           // actual data - we have `active_entities` valid slots
+    // for swap delete, we want to know which entity occupies last index in data
     std::vector<Entity> idx_to_entity;  // maps data's slot index to what entity owns it
+    // sparse arr
     std::array<u32, MAX_ENTITIES> entity_to_idx{}; // maps which entity owns what slot index
 
   public:
@@ -109,7 +114,7 @@ class ComponentManagerImpl
     {
         std::apply([&](auto&... arr) constexpr -> void {
             // For each arr, its component type is known at compile time.
-            // Use remove_if_present (add this to ComponentArray) instead of
+            // Use remove_if_present instead of
             // manually checking the signature here.
             (arr.remove_if_present(e), ...);
         }, arrays);
