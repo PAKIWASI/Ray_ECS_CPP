@@ -7,7 +7,25 @@
 #include "system_manager.hpp"
 #include "archetype.hpp"
 
+/* TODO: how to make API for external use?
+    want:
+        using MyComponents = ComponentList<C1, C2, ...>;
+        using MySystems    = SystemList<S1, S2, ...>;
+        using World        = World<MyComponents, MySystems>;
+    Avoiding the include-order footgun entirely:
+        need to make world templated on two lists: ComponentList and SystemList
 
+    then we can do:
+        class World {
+            using ComponentManager = typename make_component_manager<ComponentList>::type;
+            using SystemManager    = typename make_system_manager<SystemList>::type;
+
+            EntityManager    entity_manager;
+            ComponentManager component_manager {};
+            SystemManager    system_manager {};
+        }
+
+*/
 
 class World
 {
