@@ -49,8 +49,9 @@ add_executable(main
 # Include raylib headers, plus ours
 target_include_directories(main PRIVATE
     include
-    include/components
-    include/systems
+    include/ecs
+    include/ecs/components
+    include/ecs/systems
     ${RAYLIB_INCLUDE_DIR}
 )
 
