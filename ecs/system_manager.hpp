@@ -52,8 +52,11 @@ class SystemManagerImpl
     // Update all systems with schedule
     void update(float dt, Schedule schedule)
     {
+        // TODO: how to do better ?
         std::apply([&](auto&... sys) -> void {
             ((schedule.test(
+                // decltype expands to the current type in the fold expression expansion
+                // remove_cvref removes const and ref
                 system_id<std::remove_cvref_t<decltype(sys)>>
             ) ? sys.update(dt) : void()), ...);
         }, systems);
@@ -77,8 +80,9 @@ class SystemManagerImpl
         bool qualifies = (new_sig & System::get_signature()) == System::get_signature();
         bool has       = sys.has_entity(e);
 
-        if      ( qualifies && !has) { sys.add_entity(e); }
+        if      ( qualifies && !has) { sys.add_entity(e);    }
         else if (!qualifies &&  has) { sys.remove_entity(e); }
     }
 };
+
 

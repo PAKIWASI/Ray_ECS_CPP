@@ -105,7 +105,7 @@ class ComponentManagerImpl
 
     // this no longer needs virtual dispatch
     // the fold expression explands to one call per array, all inlined
-    void entity_destroyed(Entity e, Signature sig)
+    void entity_destroyed(Entity e)
     {
         std::apply([&](auto&... arr) constexpr -> void {
             // For each arr, its component type is known at compile time.
