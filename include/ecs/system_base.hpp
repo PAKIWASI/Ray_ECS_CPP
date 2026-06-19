@@ -112,12 +112,7 @@ class SystemBase
 
         size_t count = dense.size();
         sparse[e] = count;
-        // TODO: is this even needed?
-        if (count >= dense.size()) {
-            dense.emplace_back(e);      // size++
-        } else {
-            dense[count] = e;
-        }
+        dense.emplace_back(e);      // size++
     }
 
     void remove_entity(Entity e)

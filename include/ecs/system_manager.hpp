@@ -22,14 +22,6 @@ class SystemManagerImpl
         : systems(Systems(cm)...)
     {}
 
-    // // Helper to create all systems with ComponentManager
-    // template <typename... Sys>
-    // static auto create_systems(ComponentManager& cm)
-    // {
-    //     // Create each system with the ComponentManager reference
-    //     return std::tuple<Sys...>(Sys(cm)...);
-    // }
-
     // Get system by type - compile-time lookup
     template <typename T>
     [[nodiscard]] auto get_system() -> T& { return std::get<T>(systems); }
@@ -55,7 +47,6 @@ class SystemManagerImpl
     // Update all systems with schedule
     void update(float dt, Schedule schedule)
     {
-        // TODO: how to do better ?
         std::apply([&](auto&... sys) -> void {
             ((schedule.test(
                 // decltype expands to the current type in the fold expression expansion
