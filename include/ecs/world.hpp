@@ -1,42 +1,102 @@
 #pragma once
 
+// World<CList, SList>
+//
+// The public API surface — orchestrates EntityManager, ComponentManager,
+// SystemManager, and Archetype creation.
+//
+// Templated on:
+//   CList — ComponentList<Ts...> from game_registry.hpp
+//   SList — SystemList<Ts...>    from game_registry.hpp
+//
+// All type aliases (ComponentManager, SystemManager, component_id, system_id)
+// are members of World so they are scoped to the correct lists. This means
+// two World instantiations in the same program never share or collide aliases.
+//
+// make_schedule<Ts...>() is a static member that builds a Schedule bitset
+// from system types — it must be a member because it needs SList.
+//
+// Usage:
+//   #include "game_registry.hpp"   // defines MyComponents, MySystems, GameWorld
+//   GameWorld world;
+//   Entity e = world.create_entity();
+//   world.add_component<Transform2>(e, Transform2{});
+//   world.update(dt, GameWorld::make_schedule<GravitySystem, MovementSystem>());
+
 #include "common.hpp"
 #include "component_manager.hpp"
 #include "component_registry.hpp"
 #include "entity_manager.hpp"
 #include "system_manager.hpp"
+#include "system_registry.hpp"
 #include "archetype.hpp"
 
-/* TODO: how to make API for external use?
-    want:
-        using MyComponents = ComponentList<C1, C2, ...>;
-        using MySystems    = SystemList<S1, S2, ...>;
-        using World        = World<MyComponents, MySystems>;
-    Avoiding the include-order footgun entirely:
-        need to make world templated on two lists: ComponentList and SystemList
 
-    then we can do:
-        class World {
-            using ComponentManager = typename make_component_manager<ComponentList>::type;
-            using SystemManager    = typename make_system_manager<SystemList>::type;
+// World — primary template (intentionally incomplete)
+// =============================================================================
+// Forces users to always instantiate with explicit ComponentList and SystemList.
+// Catching wrong usage at the template level rather than inside the body.
 
-            EntityManager    entity_manager;
-            ComponentManager component_manager {};
-            SystemManager    system_manager {};
-        }
+template <typename CList, typename SList>
+class World;
 
-    user can add their own components and systems in game_registry.hpp
-    they can also use library provided components and systems, just add them to the list
-*/
 
-class World
+// World<ComponentList<CList...>, SystemList<SList...>>
+// =============================================================================
+
+template <typename... CList, typename... SList>
+class World<ComponentList<CList...>, SystemList<SList...>>
 {
+  public:
+
+    // Type aliases — scoped to this World instantiation
+    // -------------------------------------------------------------------------
+
+    using MyComponentList = ComponentList<CList...>;
+    using MySystemList    = SystemList<SList...>;
+
+    using ComponentManager = typename make_component_manager<MyComponentList>::type;
+    using SystemManager    = typename make_system_manager<MySystemList>::type;
+
+    // Compile-time ID lookup — same interface as the old global aliases but
+    // scoped so two World instantiations never collide
+    template <typename T>
+    static constexpr ComponentType component_id =
+        comp_type_index<T, MyComponentList>::value;
+
+    template <typename T>
+    static constexpr SystemType system_id =
+        sys_type_index<T, MySystemList>::value;
+
+    // Build a Schedule bitset from a list of system types.
+    // consteval = computed at compile time, embeds as a bitset literal.
+    // Usage: constexpr auto sched = GameWorld::make_schedule<GravitySystem, MovementSystem>();
+    template <typename... Ts>
+    static consteval auto make_schedule() -> Schedule
+    {
+        Schedule s{};
+        (s.set(sys_type_index<Ts, MySystemList>::value), ...);
+        return s;
+    }
+
+    // Archetype helper — binds CList so callers don't need to pass it
+    template <typename... Ts>
+    using Archetype = ::Archetype<MyComponentList, Ts...>;
+
+
   private:
+
+    // Stored in construction order — component_manager must be initialized
+    // before system_manager because systems hold a ref to it
     EntityManager    entity_manager;
-    ComponentManager component_manager {};
-    SystemManager    system_manager {component_manager};
+    ComponentManager component_manager{};
+    SystemManager    system_manager{component_manager};
+
 
   public:
+
+    // Entity API
+    // -------------------------------------------------------------------------
 
     [[nodiscard]] auto create_entity(Signature sig = 0) -> Entity
     {
@@ -45,29 +105,32 @@ class World
 
     void destroy_entity(Entity e)
     {
-        // order matters here
-        // systems and components must clean up before the id is recycled
-        system_manager.    on_entity_destroyed(e);
-        component_manager. entity_destroyed(e);
-        entity_manager.    destroy(e);
+        // Order matters: systems and components clean up before the ID is recycled
+        system_manager.on_entity_destroyed(e);
+        component_manager.entity_destroyed(e);
+        entity_manager.destroy(e);
     }
 
-    // TODO: understand archtype init
 
-    // Overload 1: default-constructed
+    // Archetype creation
+    // -------------------------------------------------------------------------
+
+    // Overload 1: default-construct each component
+    // Use when you want to create entities in bulk and fill data afterwards
     template <ArchetypeType_t A>
     [[nodiscard]] auto create_from_archetype() -> Entity
     {
         Entity e = entity_manager.create();
         A::for_each_type([&]<typename T>() -> void {
-            component_manager.get_arr<T>().add_data(e, T{});
+            component_manager.template get_arr<T>().add_data(e, T{});
             entity_manager.set_component(e, component_id<T>);
         });
         system_manager.on_signature_change(e, entity_manager.get_signature(e));
         return e;
     }
 
-    // Overload 2: caller supplied component values
+    // Overload 2: caller supplies initial component values
+    // Args must match the archetype's component types in order
     template <ArchetypeType_t A, typename... Args>
     [[nodiscard]] auto create_from_archetype(Args&&... args) -> Entity
     {
@@ -76,12 +139,14 @@ class World
         return e;
     }
 
+
     // Component API
+    // -------------------------------------------------------------------------
 
     template <ComponentType_t T>
     void add_component(Entity e, T comp)
     {
-        component_manager.get_arr<T>().add_data(e, std::move(comp));
+        component_manager.template get_arr<T>().add_data(e, std::move(comp));
         entity_manager.set_component(e, component_id<T>);
         system_manager.on_signature_change(e, entity_manager.get_signature(e));
     }
@@ -89,29 +154,47 @@ class World
     template <ComponentType_t T>
     void remove_component(Entity e)
     {
-        component_manager.get_arr<T>().remove_data(e);
+        component_manager.template get_arr<T>().remove_data(e);
         entity_manager.unset_component(e, component_id<T>);
         system_manager.on_signature_change(e, entity_manager.get_signature(e));
     }
 
+    template <ComponentType_t T>
+    [[nodiscard]] auto get_component(Entity e) -> T&
+    {
+        return component_manager.template get_arr<T>().get_data(e);
+    }
+
+    template <ComponentType_t T>
+    [[nodiscard]] auto get_component(Entity e) const -> const T&
+    {
+        return component_manager.template get_arr<T>().get_data(e);
+    }
+
+    // Expose the manager for systems that hold a direct ref (see SystemBase)
+    [[nodiscard]] auto get_component_manager() -> ComponentManager&
+    {
+        return component_manager;
+    }
+
+
     // System API
+    // -------------------------------------------------------------------------
 
     void update(float dt, Schedule schedule)
     {
         system_manager.update(dt, schedule);
     }
+
+    template <typename T>
+    void update_system(float dt)
+    {
+        system_manager.template update_system<T>(dt);
+    }
+
+    template <typename T>
+    [[nodiscard]] auto get_entity_count() const -> u32
+    {
+        return system_manager.template get_entity_count<T>();
+    }
 };
-
-
-// make a compile time schedule your systems
-template <typename... Ts>
-static consteval auto make_schedule() -> Schedule {
-    Schedule s{};
-    (s.set(system_id<Ts>), ...);
-    return s;
-}
-
-// Usage:
-constexpr Schedule PHYSICS_ONLY = make_schedule<PhysicsSystem>();
-
-

@@ -1,74 +1,57 @@
 #pragma once
 
-// The single source of truth for all component IDs
-// The position of each type in this list is it's permanent ID
+// ComponentList and comp_type_index — pure library infrastructure.
+//
+// This file deliberately does NOT include any game component headers (2d_comps.hpp etc).
+// It only needs common.hpp for ComponentType_t and ComponentType.
+// Game components are coupled to the user's game_registry.hpp, not here.
 
-#include "wasi.hpp"
 #include "common.hpp"
-#include "2d_comps.hpp"
 
 
-using namespace ECS_COMPS_2D;
-using namespace wasi;
+// ComponentList — ordered type list, position = permanent component ID
+// =============================================================================
 
-
-// Takes list of Component types as a pack and saves a compile time
-// count, it also has pack info embedded, which we will extract
+// Wraps a parameter pack of component types.
+// The index of each type in the pack is its component ID.
+// Once defined in game_registry.hpp, NEVER reorder.
 template <ComponentType_t... Ts>
 struct ComponentList {
     static constexpr u8 count = sizeof...(Ts);
 };
 
 
-// Cononical list of component types
-// Add new core Components here - order determines ID
-using Components = ComponentList<
-    Transform2,     // ID 0
-    RigidBody2,     // ID 1
-    Gravity2        // ID 2
->;
+// comp_type_index — compile-time ID lookup
+// =============================================================================
+// "What is the ID of type T in ComponentList List?"
+// Returns a constexpr u8. Hard error at compile time if T is not in List.
 
-
-// Type Index: Compile time ID lookup
-// What is the ID of type `T` in list `List`
-// Result is a constexpr u8, computed entirely at compile time
-
-// first we do forward declaration without defining struct
+// Primary template — intentionally undefined. Instantiating with anything
+// other than a ComponentList triggers an incomplete type error.
 template <typename T, typename List>
 struct comp_type_index;
 
-// partial specilization: this def is used when we pass ComponentList<Ts...> as the `List`
-template <typename T, typename... Ts>       // whatever passed, first is T and rest are Ts...
-struct comp_type_index<T, ComponentList<Ts...>>  // we passed this as List
+// Partial specialization: fires when List = ComponentList<Ts...>
+// Unpacks the list and searches for T using a consteval lambda.
+template <typename T, typename... Ts>
+struct comp_type_index<T, ComponentList<Ts...>>
 {
-    // static constexpr member var, computed at compile time
-    // using a consteval lambda, enabling us to use loops at compile time
-    static constexpr u8 value = []() consteval -> u8 {
-        // is_same_v<T, U> returns compile time bool if T is same type as U
-        // is_same_v<T,Ts>... replaces Ts with each T in the pack and we get an array of bools
-        constexpr bool matches[] { std::is_same_v<T, Ts>... };  // { is_same_v<T, T1>, is_same_v<T, T2>, is_same_v<T, T3>,... }
+    static constexpr u8 value = []() consteval -> u8
+    {
+        // Expand the pack into a bool array: matches[i] = (T == Ts[i])
+        constexpr bool matches[] { std::is_same_v<T, Ts>... };
 
-        // loop to find the index which is true, should be exactly one
         for (u8 i = 0; i < sizeof...(Ts); ++i) {
             if (matches[i]) { return i; }
         }
-        // if T is not in the list, hard error at compile time
-        // BUG: static_assert(false) is getting evaluated before template instantiation?
-        // static_assert(false, "Component type is not registered in ComponentList");
-        // static_assert(sizeof(Ts) == 0);
-        // []<bool flag = false>() -> auto { static_assert(flag, "Component not in list"); }();
-        return std::numeric_limits<u8>::max();  // backup for now
+
+        // T is not in this ComponentList.
+        // The returned max value will be caught by static_asserts in
+        // game_registry.hpp. We cannot static_assert(false) here because
+        // that fires before instantiation in C++ pre-C++26.
+        return std::numeric_limits<u8>::max();
     }();
 };
-
-// API Alias
-template  <typename T>
-constexpr ComponentType component_id = comp_type_index<T, Components>::value;
-
-// final test: have to do this 'cause the stupid fucking static_assert(false) is not working
-static_assert(component_id<Transform2> == 0, "Transform2 id wrong!");
-static_assert(component_id<RigidBody2> == 1, "RigidBody2 id wrong!");
-static_assert(component_id<Gravity2>   == 2, "Gravity2 id wrong!");
 
 
 

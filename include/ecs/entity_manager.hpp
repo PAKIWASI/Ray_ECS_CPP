@@ -2,20 +2,27 @@
 
 #include "common.hpp"
 
+#include <array>
 #include <cassert>
 #include <vector>
-#include <array>
 
+
+// EntityManager
+// =============================================================================
+// Issues and recycles entity IDs. Stores per-entity component signatures.
+//
+// IDs are u32 indices into component arrays. Destroyed IDs go into free_ids
+// for reuse. Signatures are a bitset of which components the entity has —
+// maintained here so SystemManager can check qualification without touching
+// component arrays.
 
 class EntityManager
 {
   private:
-    // no startup cost of pre filling container with ids
     Entity next_id = 0;
-    // when an entity dies, it's id goes here for reuse
-    std::vector<Entity> free_ids;
-
+    std::vector<Entity>              free_ids;
     std::array<Signature, MAX_ENTITIES> signatures{};
+
   public:
 
     EntityManager() {
@@ -24,7 +31,7 @@ class EntityManager
 
     [[nodiscard]] auto create(Signature sig = 0) -> Entity
     {
-        Entity chosen {};
+        Entity chosen{};
         if (!free_ids.empty()) {
             chosen = free_ids.back();
             free_ids.pop_back();
@@ -33,39 +40,34 @@ class EntityManager
             chosen = next_id++;
         }
 
-        if (sig != 0) {
-            signatures.at(chosen) = sig;
-        }
-
+        signatures.at(chosen) = sig;
         return chosen;
     }
 
     void destroy(Entity e)
     {
-        // max value of next_id is MAX_ENTITIES
         assert(e < next_id && "Entity out of range");
-        // reset the signature for later use
         signatures.at(e).reset();
         free_ids.emplace_back(e);
     }
 
     void set_component(Entity e, ComponentType c)
     {
-        assert(e < next_id && "Entity out of range");
+        assert(e < next_id        && "Entity out of range");
         assert(c < MAX_COMPONENTS && "Component out of range");
         signatures.at(e).set(c);
     }
 
     void unset_component(Entity e, ComponentType c)
     {
-        assert(e < next_id && "Entity out of range");
+        assert(e < next_id        && "Entity out of range");
         assert(c < MAX_COMPONENTS && "Component out of range");
         signatures.at(e).reset(c);
     }
 
     [[nodiscard]] auto has_component(Entity e, ComponentType c) const -> bool
     {
-        assert(e < next_id && "Entity out of range");
+        assert(e < next_id        && "Entity out of range");
         assert(c < MAX_COMPONENTS && "Component out of range");
         return signatures.at(e).test(c);
     }
@@ -76,12 +78,9 @@ class EntityManager
         signatures.at(e) = sig;
     }
 
-    [[nodiscard]] auto get_signature(Entity e) -> Signature
+    [[nodiscard]] auto get_signature(Entity e) const -> Signature
     {
         assert(e < next_id && "Entity out of range");
         return signatures.at(e);
     }
-
 };
-
-

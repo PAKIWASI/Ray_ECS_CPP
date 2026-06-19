@@ -1,169 +1,176 @@
 #pragma once
 
-#include "component_manager.hpp"
+// SystemBase<Derived, CMgr, ComponentTypes...>
+//
+// CRTP base for all systems. No virtual functions, no vtable, no ISystem.
+//
+// Template parameters:
+//   Derived          — the concrete system class (CRTP)
+//   CMgr             — the concrete ComponentManagerImpl instantiation.
+//                      Carries ListType so we can call comp_type_index without
+//                      a separate CList parameter.
+//   ComponentTypes...— the components this system requires (used to compute
+//                      the system's signature at compile time)
+//
+// Why template on CMgr instead of the ComponentList directly?
+//   SystemBase needs both: the manager (to store a ref and call get_arr<T>())
+//   and the list (to compute the signature via comp_type_index).
+//   CMgr::ListType gives us the list for free — one template param, not two.
+//
+// make_signature<CList, Ts...>() is a free function that takes the list
+// explicitly, using comp_type_index<T, CList>::value — no global component_id.
 
-#include <bitset>
+#include "common.hpp"
+#include "component_manager.hpp"   // ComponentArray, ComponentManagerImpl, make_component_manager
+
+#include <array>
 #include <cassert>
-#include <concepts>
 #include <vector>
 
 
-// what counts as a system
-// each system MUST have:
-//  - an update_impl(dt) method
-//  - an array of entities it operates on
-//  - a signature computed at compile time
-//  - a ref to ComponentManager during construction
-template <typename T>
-concept SystemType_t = requires(T& system, const T& csystem, float dt) {
-    // 1. Must have update_impl(dt)
-    { system.update_impl(dt) } -> std::same_as<void>;
+// make_signature — compute a Signature bitset at compile time
+// =============================================================================
+// Takes the ComponentList type explicitly so it works without a global alias.
+// Called inside SystemBase with CMgr::ListType.
 
-    // 2. Must expose a static, compile-time signature
-    { T::get_signature() } -> std::same_as<Signature>;
-
-    // 3. Must expose its entity set for iteration
-    { system.add_entity(Entity{}) } -> std::same_as<void>;
-    { system.remove_entity(Entity{}) } -> std::same_as<void>;
-    { csystem.has_entity(Entity{}) } -> std::same_as<bool>;
-
-    // 4. Must be constructible from a ComponentManager (this is how systems
-    //    get easy access to the components it needs
-    requires std::constructible_from<T, ComponentManager&>;
-};
-// TODO:
-// Most of these requirements are met in SystemBase, which we control
-// we already have add/remove/has entity in base
-// systems only need to inherit from systembase, have a constructor taking ComponentManager&
-// and pass it to base and have a update_impl(float dt) method
-// we should update the System concept to reflect this
-// template <typename T, typename ...Ts>
-// concept SystemType_t2 = requires(T& system, float dt) {
-//     // 1. Must have update_impl(dt)
-//     { system.update_impl(dt) } -> std::same_as<void>;
-//
-//     // 2. Must inherit from SystemBase           // I think the Ts... is wrong
-//     requires std::derived_from<T, SystemBase<Ts...>>;   //Systembase not known atp
-//
-//     // 3. Must be constructible from a ComponentManager
-//     requires std::constructible_from<T, ComponentManager&>;
-// };
-
-
-// Helper to compute system signature from component list
-template <typename... Ts>
+template <typename CList, typename... Ts>
 consteval auto make_signature() -> Signature
 {
-    Signature sig;
-    ((sig.set(component_id<Ts>)), ...);
+    Signature sig{};
+    // For each component type Ts, set the bit at its position in CList
+    ((sig.set(comp_type_index<Ts, CList>::value)), ...);
     return sig;
 }
 
 
-// CRTP base - no virtual functions, vtable, or runtime references
-template <typename Derived, typename... ComponentTypes>
+// SystemBase<Derived, CMgr, ComponentTypes...>
+// =============================================================================
+
+template <typename Derived, typename CMgr, typename... ComponentTypes>
 class SystemBase
 {
   protected:
-    // Sparse set implementation
-    std::vector<Entity>           dense;     // Contiguous entities for iteration
-    std::array<u32, MAX_ENTITIES> sparse{};  // Maps entity -> index in dense
+    // Sparse set — O(1) add, O(1) remove, O(n) sequential iteration
+    // -------------------------------------------------------------------------
+    // dense[i]   = the i-th active entity (contiguous, iteration is sequential)
+    // sparse[e]  = index of entity e in dense (INVALID = not in this system)
+    //
+    // Invariant: sparse[dense[i]] == i for all i < dense.size()
+    //            dense[sparse[e]] == e for all e with sparse[e] != INVALID
+    std::vector<Entity>           dense;
+    std::array<u32, MAX_ENTITIES> sparse{};
 
-    // Pointer to ComponentManager - single runtime indirection
-    // This is the ONLY runtime data we need
-    ComponentManager& comp_manager;
+    // Single runtime reference — the only non-constexpr data besides the entity set
+    CMgr& comp_manager;
 
-    // Computed signature at compile time
-    static constexpr Signature signature = make_signature<ComponentTypes...>();
+    // Signature computed from ComponentTypes at compile time via CMgr::ListType.
+    // make_signature resolves comp_type_index<T, ListType>::value for each T.
+    static constexpr Signature signature =
+        make_signature<typename CMgr::ListType, ComponentTypes...>();
 
   public:
     auto operator=(const SystemBase&) -> SystemBase& = delete;
-    auto operator=(SystemBase&&) -> SystemBase&      = delete;
+    auto operator=(SystemBase&&)      -> SystemBase& = delete;
 
-    // Constructor with ComponentManager
-    SystemBase(ComponentManager& cm) : comp_manager(cm)
+    explicit SystemBase(CMgr& cm) : comp_manager(cm)
     {
         dense.reserve(PRE_INIT_SIZE);
         sparse.fill(INVALID);
     }
 
-    SystemBase(SystemBase& other) noexcept
-        : comp_manager(other.comp_manager)
-        , dense(std::move(other.dense))
-        , sparse(other.sparse)
-    {}
-
-    // move constructor
+    // Move constructor — needed because SystemManagerImpl stores systems in a
+    // tuple and constructs them with Systems(cm)... which may invoke moves
     SystemBase(SystemBase&& other) noexcept
         : comp_manager(other.comp_manager)
         , dense(std::move(other.dense))
         , sparse(other.sparse)
     {}
 
-    // No virtual destructor - zero overhead
+    // Copy intentionally deleted — systems own their entity sets
+    SystemBase(const SystemBase&) = delete;
+
     ~SystemBase() = default;
 
 
     // Entity management
+    // -------------------------------------------------------------------------
+
     void add_entity(Entity e)
     {
-        assert(e < MAX_ENTITIES && "Entity out of range");
-        assert(!has_entity(e) && "Entity already in system");
+        assert(e < MAX_ENTITIES  && "Entity out of range");
+        assert(!has_entity(e)    && "Entity already in system");
 
-        size_t count = dense.size();
-        sparse[e] = count;
-        dense.emplace_back(e);      // size++
+        sparse[e] = static_cast<u32>(dense.size());
+        dense.emplace_back(e);
     }
 
     void remove_entity(Entity e)
     {
         assert(e < MAX_ENTITIES && "Entity out of range");
-        assert(has_entity(e) && "Entity not in system");
+        assert(has_entity(e)    && "Entity not in system");
 
         u32    idx         = sparse[e];
-        u32    last_idx    = dense.size() - 1;
+        u32    last_idx    = static_cast<u32>(dense.size()) - 1;
         Entity last_entity = dense[last_idx];
 
-        // Swap with last
+        // Swap with last, update sparse for the moved entity
         dense[idx]          = last_entity;
         sparse[last_entity] = idx;
-        dense.pop_back();           // size--
+        dense.pop_back();
 
-        // Remove
+        // Clear the removed entity's sparse slot
         sparse[e] = INVALID;
     }
 
     [[nodiscard]] auto has_entity(Entity e) const -> bool
     {
         assert(e < MAX_ENTITIES && "Entity out of range");
-        return sparse[e] != INVALID && sparse[e] < dense.size() && dense[sparse[e]] == e;
+        // Triple check: slot not INVALID, index in bounds, cross-reference valid
+        // Guards against stale indices after swap-and-pop
+        return sparse[e] != INVALID
+            && sparse[e] < static_cast<u32>(dense.size())
+            && dense[sparse[e]] == e;
     }
 
-    [[nodiscard]] static constexpr auto get_signature() -> Signature { return signature; }
+    [[nodiscard]] static constexpr auto get_signature() -> Signature
+    {
+        return signature;
+    }
 
-    [[nodiscard]] auto get_entity_count() const -> u32 { return dense.size(); }
+    [[nodiscard]] auto get_entity_count() const -> u32
+    {
+        return static_cast<u32>(dense.size());
+    }
 
-
-    // CRTP: Derived must implement update_impl
-    // Only place where Derived is used, meaning only func Derived needs to implement
-    void update(float dt) { static_cast<Derived*>(this)->update_impl(dt); }
+    // CRTP dispatch — SystemManagerImpl calls sys.update(dt) which calls
+    // Derived::update_impl(dt) directly. No virtual dispatch.
+    void update(float dt)
+    {
+        static_cast<Derived*>(this)->update_impl(dt);
+    }
 
   protected:
-    // Helper to get component data - comp_manager is the only runtime indirection
+    // Component access helpers
+    // -------------------------------------------------------------------------
+    // get_component<T>(e) goes: comp_manager.get_arr<T>().get_data(e)
+    // This is two direct memory accesses — get_arr<T>() is a compile-time
+    // std::get<> on the tuple, get_data(e) indexes into the dense vector.
+
     template <typename T>
     [[nodiscard]] auto get_component(Entity e) -> T&
     {
-        // This is a compile-time access - component_id<T> is constexpr
-        // The compiler resolves this to a direct memory access
-        return comp_manager.get_arr<T>().get_data(e);
+        return comp_manager.template get_arr<T>().get_data(e);
+    }
+
+    template <typename T>
+    [[nodiscard]] auto get_component(Entity e) const -> const T&
+    {
+        return comp_manager.template get_arr<T>().get_data(e);
     }
 
     template <typename T>
     [[nodiscard]] auto has_component(Entity e) const -> bool
     {
-        return comp_manager.get_arr<T>().has_data(e);
+        return comp_manager.template get_arr<T>().has_data(e);
     }
 };
-
-
-

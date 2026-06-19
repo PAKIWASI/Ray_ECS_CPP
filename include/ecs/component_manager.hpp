@@ -1,30 +1,38 @@
 #pragma once
 
-// With Compile time IDs from component_registry.hpp, we can initiate all
-// arrays in ComponentManager's constructor by folding over type list
-// no manual registration calls and no runtime polymorphism needed
+// ComponentArray<T>          — dense/sparse storage for one component type
+// ComponentManagerImpl<Ts...> — tuple of all arrays, no heap, no vtable
+// make_component_manager<List> — unpacks a ComponentList into ComponentManagerImpl
+//
+// No global ComponentManager alias here. The alias is created in world.hpp
+// via: using ComponentManager = make_component_manager<MyComponents>::type;
 
 #include "component_registry.hpp"
 
-#include <tuple>
-#include <cassert>
-#include <vector>
 #include <array>
+#include <cassert>
+#include <tuple>
+#include <vector>
 
 
+// ComponentArray<T>
+// =============================================================================
+// Dense/sparse storage for a single component type T.
+//
+// Layout:
+//   data[i]           — component value for the i-th active entity
+//   idx_to_entity[i]  — which entity owns slot i  (for swap-and-pop)
+//   entity_to_idx[e]  — which slot entity e uses  (INVALID = not present)
+//
+// All operations are O(1). Removal uses swap-and-pop to keep data dense.
 
-// ComponentArray templated on the ComponentType_t we will pass from ComponentList
-// we use dense/sparse array pattern for the actual storage
 template <ComponentType_t T>
 class ComponentArray
 {
   private:
-    // dense arr
-    std::vector<T>      data;           // actual data - we have `active_entities` valid slots
-    // for swap delete, we want to know which entity occupies last index in data
-    std::vector<Entity> idx_to_entity;  // maps data's slot index to what entity owns it
-    // sparse arr
-    std::array<u32, MAX_ENTITIES> entity_to_idx{}; // maps which entity owns what slot index
+    std::vector<T>                data;
+    std::vector<Entity>           idx_to_entity;
+    std::array<u32, MAX_ENTITIES> entity_to_idx{};
 
   public:
 
@@ -34,121 +42,149 @@ class ComponentArray
         entity_to_idx.fill(INVALID);
     }
 
-    void add_data(Entity e, T comp) // simple T comp allows rvalues and lvalues alike
+    // Takes T by value — caller can pass rvalue or lvalue, we always move in
+    void add_data(Entity e, T comp)
     {
-        assert(e < MAX_ENTITIES && "Entity out of range");
+        assert(e < MAX_ENTITIES       && "Entity out of range");
         assert(entity_to_idx[e] == INVALID && "Entity already has component");
 
-        entity_to_idx[e] = data.size();
+        entity_to_idx[e] = static_cast<u32>(data.size());
         idx_to_entity.emplace_back(e);
         data.emplace_back(std::move(comp));
     }
 
     void remove_data(Entity e)
     {
-        assert(e < MAX_ENTITIES && "Entity out of range");
-        u32 idx = entity_to_idx[e];
-        assert(idx != INVALID && "Entity does not have component");
+        assert(e < MAX_ENTITIES       && "Entity out of range");
+        assert(entity_to_idx[e] != INVALID && "Entity does not have component");
 
-        u32 last_idx           = data.size() - 1;
-        Entity last_entity     = idx_to_entity[last_idx];
+        u32    idx         = entity_to_idx[e];
+        u32    last_idx    = static_cast<u32>(data.size()) - 1;
+        Entity last_entity = idx_to_entity[last_idx];
 
-        // swap
-        data[idx]              = std::move(data[last_idx]);
-        idx_to_entity[idx]     = last_entity;
+        // Move last element into the vacated slot
+        data[idx]               = std::move(data[last_idx]);
+        idx_to_entity[idx]      = last_entity;
         entity_to_idx[last_entity] = idx;
 
-        // delete
-        entity_to_idx[e]       = INVALID;
+        // Erase the now-duplicate last slot
+        entity_to_idx[e] = INVALID;
         data.pop_back();
         idx_to_entity.pop_back();
     }
 
-    [[nodiscard]] auto get_data(Entity e) -> T&
+    // Safe removal used by entity_destroyed fold — no assert if not present
+    void remove_if_present(Entity e)
     {
-        assert(e < MAX_ENTITIES && "Entity out of range");
-        u32 idx = entity_to_idx[e];
-        assert(idx != INVALID && "Entity does not have component");
-        return data[idx];
+        if (has_data(e)) { remove_data(e); }
     }
 
-    [[nodiscard]] auto has_data(Entity e) -> bool
+    [[nodiscard]] auto get_data(Entity e) -> T&
+    {
+        assert(e < MAX_ENTITIES       && "Entity out of range");
+        assert(entity_to_idx[e] != INVALID && "Entity does not have component");
+        return data[entity_to_idx[e]];
+    }
+
+    [[nodiscard]] auto get_data(Entity e) const -> const T&
+    {
+        assert(e < MAX_ENTITIES       && "Entity out of range");
+        assert(entity_to_idx[e] != INVALID && "Entity does not have component");
+        return data[entity_to_idx[e]];
+    }
+
+    [[nodiscard]] auto has_data(Entity e) const -> bool
     {
         return entity_to_idx[e] != INVALID;
     }
 
-    [[nodiscard]] auto entity_count() -> u32 { return data.size(); }
-
-    [[nodiscard]] auto entity_at(u32 idx) -> Entity
+    // Direct sequential access — used by systems to drive iteration from the
+    // smallest component array instead of going through the entity set
+    [[nodiscard]] auto entity_count() const -> u32
     {
-        assert(idx < data.size() && "index out of range");
+        return static_cast<u32>(data.size());
+    }
+
+    [[nodiscard]] auto entity_at(u32 idx) const -> Entity
+    {
+        assert(idx < data.size() && "Index out of range");
         return idx_to_entity[idx];
     }
 
-    // add a safe version for the fold expression in entity_destroyed
-    // entity_destroyed calls this function on every ComponentArray, even if e doesn't have that component
-    // raw remove_data(e) would hit a runtime assert, so we first do a cheap lookup
-    void remove_if_present(Entity e) {
-        if (has_data(e)) { remove_data(e); }
+    [[nodiscard]] auto data_at(u32 idx) -> T&
+    {
+        assert(idx < data.size() && "Index out of range");
+        return data[idx];
+    }
+
+    [[nodiscard]] auto data_at(u32 idx) const -> const T&
+    {
+        assert(idx < data.size() && "Index out of range");
+        return data[idx];
     }
 };
 
-// Helper to construct ComponentManager from a ComponentList
-template <typename... Ts>
+
+// ComponentManagerImpl<Ts...>
+// =============================================================================
+// Stores one ComponentArray<T> per component type, inline in a tuple.
+// No heap allocation, no pointer indirection, no virtual dispatch.
+//
+// ListType is exported so SystemBase can derive the component list from
+// the manager type without needing a separate template parameter.
+
+template <ComponentType_t... Ts>
 class ComponentManagerImpl
 {
+  public:
+    // The component list type this manager was instantiated from.
+    // Used by SystemBase to call comp_type_index<T, ListType>::value
+    // without needing a separate CList template parameter.
+    using ListType = ComponentList<Ts...>;
+
   private:
-    // Each ComponentArray<T> lives directly inline in this tuple
-    // [ComponentArray<T1> | ComponentArray<T2> | ComponentArray<T3> ...]
+    // Inline storage: [ ComponentArray<T1> | ComponentArray<T2> | ... ]
+    // std::get<ComponentArray<T>>(arrays) resolves at compile time — zero overhead
     std::tuple<ComponentArray<Ts>...> arrays;
+
   public:
 
-    // this function is can't be consteval
-    // consteval controls whether the expression `cm.get_arr<T>()` is usable in a context
-    // demanding compile time execution, which it is not as cm is a runtime variable
-    template <typename T>
+    template <ComponentType_t T>
     auto get_arr() -> ComponentArray<T>&
     {
-        // std::get finds an element of a tuple at compile time
-        // from it's type if all elements have unique types
         return std::get<ComponentArray<T>>(arrays);
     }
 
-    // this no longer needs virtual dispatch
-    // the fold expression explands to one call per array, all inlined
+    template <ComponentType_t T>
+    auto get_arr() const -> const ComponentArray<T>&
+    {
+        return std::get<ComponentArray<T>>(arrays);
+    }
+
+    // Called when an entity is destroyed.
+    // Fold expression calls remove_if_present on every array — no signature
+    // check needed because remove_if_present is already guarded by has_data().
+    // All calls are direct and inlined — no vtable, no loop over a pointer array.
     void entity_destroyed(Entity e)
     {
-        // std::apply applies the passed lambda function to each value in the tuple
-        std::apply([&](auto&... arr) constexpr -> void {
-            // For each arr, its component type is known at compile time.
-            // Use remove_if_present instead of manually checking the signature here.
-            // if component is not present in e, that's just one if check
+        std::apply([&](auto&... arr) -> void {
             (arr.remove_if_present(e), ...);
         }, arrays);
-        // the result is:
-        // arr1.remove_if_present(e);
-        // arr2.remove_if_present(e);
-        // ...
     }
 };
 
-// Alias using our canonical list
-// Unpack ComponentList<Ts...> into ComponentManagerImpl<Ts...>
+
+// make_component_manager — unpacks ComponentList into ComponentManagerImpl
+// =============================================================================
+// Usage: using ComponentManager = make_component_manager<MyComponents>::type;
+
 template <typename List>
 struct make_component_manager;
 
-// same partial specialization pattern
-template <typename... Ts>
+template <ComponentType_t... Ts>
 struct make_component_manager<ComponentList<Ts...>> {
     using type = ComponentManagerImpl<Ts...>;
 };
 
-using ComponentManager = make_component_manager<Components>::type;
-
-// we can do:
-//      ComponentManager cm {};
-//      ComponentArray<Transform2> t_arr = cm.get_arr<Transform2>();
-//      Transform& t = t_arr.get_data(e);
-//  only two direct memory accesses
 
 
