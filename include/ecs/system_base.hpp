@@ -4,17 +4,16 @@
 
 #include <bitset>
 #include <cassert>
+#include <concepts>
 #include <vector>
 
 
 // what counts as a system
 // each system MUST have:
-//  - an update(dt) method
+//  - an update_impl(dt) method
 //  - an array of entities it operates on
 //  - a signature computed at compile time
-//  - easy access to the components it needs
-// If w can enforce these requirements at compile time, then we dont need
-// an oop hierarchy and inheritance
+//  - a ref to ComponentManager during construction
 template <typename T>
 concept SystemType_t = requires(T& system, const T& csystem, float dt) {
     // 1. Must have update_impl(dt)
@@ -29,9 +28,26 @@ concept SystemType_t = requires(T& system, const T& csystem, float dt) {
     { csystem.has_entity(Entity{}) } -> std::same_as<bool>;
 
     // 4. Must be constructible from a ComponentManager (this is how systems
-    //    get "easy access to the components it needs" — via comp_manager
+    //    get easy access to the components it needs
     requires std::constructible_from<T, ComponentManager&>;
 };
+// TODO:
+// Most of these requirements are met in SystemBase, which we control
+// we already have add/remove/has entity in base
+// systems only need to inherit from systembase, have a constructor taking ComponentManager&
+// and pass it to base and have a update_impl(float dt) method
+// we should update the System concept to reflect this
+// template <typename T, typename ...Ts>
+// concept SystemType_t2 = requires(T& system, float dt) {
+//     // 1. Must have update_impl(dt)
+//     { system.update_impl(dt) } -> std::same_as<void>;
+//
+//     // 2. Must inherit from SystemBase           // I think the Ts... is wrong
+//     requires std::derived_from<T, SystemBase<Ts...>>;   //Systembase not known atp
+//
+//     // 3. Must be constructible from a ComponentManager
+//     requires std::constructible_from<T, ComponentManager&>;
+// };
 
 
 // Helper to compute system signature from component list
@@ -61,8 +77,6 @@ class SystemBase
     static constexpr Signature signature = make_signature<ComponentTypes...>();
 
   public:
-    // SystemBase(const SystemBase&)                    = delete;
-    // SystemBase(SystemBase&&)                         = delete;
     auto operator=(const SystemBase&) -> SystemBase& = delete;
     auto operator=(SystemBase&&) -> SystemBase&      = delete;
 
@@ -98,6 +112,7 @@ class SystemBase
 
         size_t count = dense.size();
         sparse[e] = count;
+        // TODO: is this even needed?
         if (count >= dense.size()) {
             dense.emplace_back(e);      // size++
         } else {
@@ -135,6 +150,7 @@ class SystemBase
 
 
     // CRTP: Derived must implement update_impl
+    // Only place where Derived is used, meaning only func Derived needs to implement
     void update(float dt) { static_cast<Derived*>(this)->update_impl(dt); }
 
   protected:
@@ -153,5 +169,6 @@ class SystemBase
         return comp_manager.get_arr<T>().has_data(e);
     }
 };
+
 
 

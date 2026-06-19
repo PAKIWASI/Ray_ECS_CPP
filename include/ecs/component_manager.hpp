@@ -1,6 +1,6 @@
 #pragma once
 
-// With Compile time IDs from component_list.hpp, we can initiate all
+// With Compile time IDs from component_registry.hpp, we can initiate all
 // arrays in ComponentManager's constructor by folding over type list
 // no manual registration calls and no runtime polymorphism needed
 
@@ -12,6 +12,9 @@
 #include <array>
 
 
+
+// ComponentArray templated on the ComponentType_t we will pass from ComponentList
+// we use dense/sparse array pattern for the actual storage
 template <ComponentType_t T>
 class ComponentArray
 {
@@ -101,9 +104,8 @@ class ComponentManagerImpl
   public:
 
     // this function is can't be consteval
-    // consteval controls whether the expression `cm.get_arr<T>()` is usable
-    // in a context demanding compile time execution, which it is not as cm is
-    // a runtime variable
+    // consteval controls whether the expression `cm.get_arr<T>()` is usable in a context
+    // demanding compile time execution, which it is not as cm is a runtime variable
     template <typename T>
     auto get_arr() -> ComponentArray<T>&
     {
@@ -116,12 +118,17 @@ class ComponentManagerImpl
     // the fold expression explands to one call per array, all inlined
     void entity_destroyed(Entity e)
     {
+        // std::apply applies the passed lambda function to each value in the tuple
         std::apply([&](auto&... arr) constexpr -> void {
             // For each arr, its component type is known at compile time.
-            // Use remove_if_present instead of
-            // manually checking the signature here.
+            // Use remove_if_present instead of manually checking the signature here.
+            // if component is not present in e, that's just one if check
             (arr.remove_if_present(e), ...);
         }, arrays);
+        // the result is:
+        // arr1.remove_if_present(e);
+        // arr2.remove_if_present(e);
+        // ...
     }
 };
 

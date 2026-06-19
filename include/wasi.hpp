@@ -17,13 +17,13 @@ using i64 = int64_t;
 
 
 template <typename T>
-using u_ptr = std::unique_ptr<T>;
+using uptr = std::unique_ptr<T>;
 
 template <typename T>
-using s_ptr = std::shared_ptr<T>;
+using sptr = std::shared_ptr<T>;
 
 template <typename T>
-using w_ptr = std::weak_ptr<T>;
+using wptr = std::weak_ptr<T>;
 
 
 }

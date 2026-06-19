@@ -21,6 +21,7 @@ constexpr u8 MAX_COMPONENTS = 32;
 
 constexpr u8 MAX_SYSTEMS    = 16;
 
+// TODO: define one for each different use with appropriate sizes
 constexpr u32 PRE_INIT_SIZE = 100;
 
 
@@ -51,6 +52,7 @@ static constexpr u32 INVALID = std::numeric_limits<u32>::max();
 
 
 // what counts as a component
+// defined here as not to get cyclic dependency
 template <typename T>
 concept ComponentType_t = std::default_initializable<T> // each comp arr is pre-initialized
                        && std::movable<T>;              // we move data into the arr
