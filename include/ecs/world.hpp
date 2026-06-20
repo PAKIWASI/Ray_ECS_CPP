@@ -88,15 +88,15 @@ class World<ComponentList<CList...>, SystemList<SList...>>
     // Stored in construction order — component_manager must be initialized
     // before system_manager because systems hold a ref to it
     EntityManager    entity_manager;
-    ComponentManager component_manager{};
-    SystemManager    system_manager{component_manager};
+    ComponentManager component_manager {};
+    SystemManager    system_manager {component_manager};
 
 
   public:
 
     // Entity API
 
-    [[nodiscard]] auto create_entity(Signature sig = 0) -> Entity
+    [[nodiscard]] auto create_entity(Signature sig) -> Entity
     {
         return entity_manager.create(sig);
     }
@@ -117,10 +117,13 @@ class World<ComponentList<CList...>, SystemList<SList...>>
     template <ArchetypeType_t A>
     [[nodiscard]] auto create_from_archetype() -> Entity
     {
-        Entity e = entity_manager.create();
+        // entity_manager.create() now requires a non-empty signature up front
+        // (an entity with zero components is meaningless). The archetype's
+        // signature is known at compile time, so pass it directly instead of
+        // creating bare and patching bits in afterward.
+        Entity e = entity_manager.create(A::signature());
         A::for_each_type([&]<typename T>() -> void {
             component_manager.template get_arr<T>().add_data(e, T{});
-            entity_manager.set_component(e, component_id<T>);
         });
         system_manager.on_signature_change(e, entity_manager.get_signature(e));
         return e;
@@ -128,20 +131,15 @@ class World<ComponentList<CList...>, SystemList<SList...>>
  
     // Overload 2: caller supplies initial component values
     // Args must match the archetype's component types in order.
-    //
-    // Does NOT call add_component() in a fold — that would fire
-    // on_signature_change once per component (O(systems × components)).
-    // Instead we store data and update the entity signature for each arg
-    // inline, then call on_signature_change exactly once at the end, matching
-    // the behaviour of overload 1.
     template <ArchetypeType_t A, typename... Args>
     [[nodiscard]] auto create_from_archetype(Args&&... args) -> Entity
     {
-        Entity e = entity_manager.create();
+        // Same reasoning as overload 1: pass the full archetype signature to
+        // create() up front rather than creating bare and setting bits after.
+        Entity e = entity_manager.create(A::signature());
         (
             [&]<typename T>(T&& comp) -> void {
                 component_manager.template get_arr<T>().add_data(e, std::forward<T>(comp));
-                entity_manager.set_component(e, component_id<std::remove_cvref_t<T>>);
             }(std::forward<Args>(args)),
         ...);
         system_manager.on_signature_change(e, entity_manager.get_signature(e));
@@ -205,5 +203,3 @@ class World<ComponentList<CList...>, SystemList<SList...>>
         return system_manager.template get_entity_count<T>();
     }
 };
-
-

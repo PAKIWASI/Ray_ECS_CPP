@@ -1,4 +1,3 @@
-#include "common.hpp"
 #include "game_registry.hpp"
 
 

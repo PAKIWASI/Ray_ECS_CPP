@@ -29,7 +29,7 @@ class EntityManager
         free_ids.reserve(PRE_INIT_SIZE);
     }
 
-    [[nodiscard]] auto create(Signature sig = 0) -> Entity
+    [[nodiscard]] auto create(Signature sig) -> Entity
     {
         Entity chosen{};
         if (!free_ids.empty()) {
@@ -46,7 +46,10 @@ class EntityManager
 
     void destroy(Entity e)
     {
-        assert(e < next_id && "Entity out of range");
+        // second check prevents double destroy of entities
+        // entity is always initilized with atleast one component
+        assert(e < next_id && !signatures.at(e).none()
+               && "Entity out of range");
         signatures.at(e).reset();
         free_ids.emplace_back(e);
     }
