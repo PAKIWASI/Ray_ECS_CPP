@@ -1,14 +1,9 @@
-#include "common.hpp"
-#include "world.hpp"
-
+#include "game_registry.hpp"
 
 
 auto main() -> int
 {
-    World world {};
-
-    Entity e = world.create_from_archetype<PlayerArchetype>();
-
+    GameWorld w {};
 
     return 0;
 }

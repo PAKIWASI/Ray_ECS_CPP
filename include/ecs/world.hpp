@@ -82,6 +82,7 @@ class World<ComponentList<CList...>, SystemList<SList...>>
     // Archetype helper — binds CList so callers don't need to pass it
     template <typename... Ts>
     using Archetype = ::Archetype<MyComponentList, Ts...>;
+    // TODO: understand
 
 
   private:
@@ -112,6 +113,7 @@ class World<ComponentList<CList...>, SystemList<SList...>>
     }
 
 
+    // TODO: understand
     // Archetype creation
     // -------------------------------------------------------------------------
 
@@ -198,3 +200,5 @@ class World<ComponentList<CList...>, SystemList<SList...>>
         return system_manager.template get_entity_count<T>();
     }
 };
+
+

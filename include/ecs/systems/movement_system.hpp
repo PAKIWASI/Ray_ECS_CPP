@@ -26,6 +26,7 @@ class MovementSystem : public SystemBase<MovementSystem<CMgr>, CMgr, Transform2,
     // Driving from the smaller set avoids processing entities that don't move.
     void update_impl(float dt)
     {
+                                                // TODO: what is this template syntax?
         auto& rigidbodies = this->comp_manager.template get_arr<RigidBody2>();
         auto& transforms  = this->comp_manager.template get_arr<Transform2>();
 

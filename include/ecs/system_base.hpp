@@ -21,7 +21,7 @@
 // explicitly, using comp_type_index<T, CList>::value — no global component_id.
 
 #include "common.hpp"
-#include "component_manager.hpp"   // ComponentArray, ComponentManagerImpl, make_component_manager
+#include "component_registry.hpp"
 
 #include <array>
 #include <cassert>

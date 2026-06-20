@@ -22,6 +22,7 @@
 #include "2d_comps.hpp"
 using namespace ECS_COMPS_2D;
 
+
 // --- 3. Define the component list — ORDER IS PERMANENT ---
 using MyComponents = ComponentList<
     Transform2,   // ID 0
@@ -29,6 +30,7 @@ using MyComponents = ComponentList<
     Gravity2      // ID 2
     // Add new components here. Never reorder existing entries.
 >;
+
 
 // --- 4. Convenience alias: component_id<T> ---
 // This is the public API for compile-time component ID lookup.
@@ -49,10 +51,11 @@ using ComponentManager = make_component_manager<MyComponents>::type;
 // --- 6. System headers — included AFTER ComponentManager is defined ---
 // Systems are templated on CMgr so they don't need to be included before
 // the lists are defined. The template parameter carries the list via CMgr::ListType.
-#include "systems/gravity_system.hpp"
-#include "systems/movement_system.hpp"
-#include "systems/physics_system.hpp"
+#include "gravity_system.hpp"
+#include "movement_system.hpp"
+#include "physics_system.hpp"
 // Add new system headers here.
+
 
 // --- 7. Define the system list — ORDER IS PERMANENT (= schedule bit position) ---
 using MySystems = SystemList<
@@ -61,6 +64,7 @@ using MySystems = SystemList<
     PhysicsSystem<ComponentManager>     // bit 2
     // Add new systems here. Never reorder existing entries.
 >;
+
 
 // --- 8. Convenience alias: system_id<T> ---
 template <typename T>
