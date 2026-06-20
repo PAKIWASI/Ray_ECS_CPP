@@ -1,8 +1,7 @@
 # wasi-ecs
 
-A small, header-only, compile-time Entity Component System for C++23, built for
-a 2D game on top of raylib. No runtime polymorphism, no type erasure, no
-virtual calls in the hot path.
+A small, header-only, compile-time Entity Component System for C++23. No
+runtime polymorphism, no type erasure, no virtual calls in the hot path.
 
 ## Design
 
@@ -33,9 +32,15 @@ virtual calls in the hot path.
 
 Architecturally close to EnTT's sparse-set core, but trades runtime
 flexibility for compile-time IDs and zero type erasure. No archetype-grouped
-storage like flecs/bevy, so multi-component iteration isn't as cache-optimal —
-the tradeoff is no migration cost when entities gain/lose components, which is
-frequent in small 2D games.
+storage like flecs/bevy: add/remove component is O(1) with zero data
+movement here, versus an O(k) move into a different table for archetype
+storage — but multi-component iteration pays a random lookup per entity
+instead of being fully contiguous. Whether that's a good trade depends on
+the workload, not on the genre: it favors components that change
+composition often relative to how often wide multi-component scans run; it's
+a worse fit if iteration dominates and most entities' component sets are
+fixed at spawn. See [Future plans](#future-plans) for archetype-grouped
+storage as an option, not a replacement.
 
 ## File map
 
@@ -116,6 +121,41 @@ Entity e2 = world.create_from_archetype<PlayerArchetype>(
 Raise `MAX_ENTITIES` in `common.hpp` if you need more; each component array
 and system holds one `std::array<u32, MAX_ENTITIES>` sparse table (4KB each).
 
+## Future plans
+
+### Paged sparse arrays
+
+Every sparse array today (`ComponentArray::entity_to_idx`,
+`SystemBase::sparse`, `EntityManager::signatures`) is one flat
+`std::array<T, MAX_ENTITIES>`, allocated in full regardless of how many
+entities actually use it. Planned fix: replace these with a shared
+`PagedSparseArray<T>`, EnTT-style — 1024 entries per page, pages allocated
+lazily on first write instead of all at once.
+
+This makes raising `MAX_ENTITIES` cheap for component types whose usage
+stays clustered (e.g. a setup-only marker only the first N entities ever
+get) — verified at 96.7% memory savings in a standalone prototype for that
+case. It's a much smaller win (~12% in the same prototype) for component
+types that end up touching most of the address space over a long-running
+program's lifetime, since scattered access ends up allocating most pages
+anyway. Full design, call-site diffs, and a tested standalone prototype
+exist; not yet integrated into the core.
+
+### Archetype-grouped storage
+
+Currently `Archetype<CList, Ts...>` is explicitly *not* a storage strategy —
+it's a convenience for batch entity creation, while components stay
+per-type in `ComponentArray<T>`. A future option (not a planned replacement
+of the current design, since each wins for a different workload — see
+[Why not EnTT / flecs?](#why-not-entt--flecs) above) would group entities by
+their exact component set into per-archetype tables, the way flecs/bevy do.
+That makes multi-component iteration fully contiguous (no per-entity random
+lookup), at the cost of an O(k) data move whenever an entity's component set
+changes. Worth pursuing if profiling shows the random-lookup cost in
+multi-component systems dominating over component add/remove cost — not
+worth it if the opposite is true. This is a real rewrite of the storage
+layer, not a tweak; conceptual only at this point, no detailed design yet.
+
 ## Known limitations
 
 - `RigidBody2::a` (acceleration) is currently unused — no system integrates it.
@@ -124,5 +164,3 @@ and system holds one `std::array<u32, MAX_ENTITIES>` sparse table (4KB each).
 - `EntityManager::create()` doesn't itself assert that the signature is
   non-empty — passing an empty signature is caught later, at `destroy()`,
   where it's indistinguishable from a double-destroy.
-- Sparse/dense storage policy per component type (opt-in dense-only storage
-  for components every entity has) is not yet implemented.
