@@ -18,7 +18,7 @@
 //   CMgr::ListType gives us the list for free — one template param, not two.
 //
 // make_signature<CList, Ts...>() is a free function that takes the list
-// explicitly, using comp_type_index<T, CList>::value — no global component_id.
+// explicitly, using comp_type_index<T, CList>::value
 
 #include "common.hpp"
 #include "component_registry.hpp"
@@ -28,9 +28,8 @@
 #include <vector>
 
 
-// make_signature — compute a Signature bitset at compile time
-// =============================================================================
-// Takes the ComponentList type explicitly so it works without a global alias.
+// compute a Signature bitset at compile time
+// ===========================================
 // Called inside SystemBase with CMgr::ListType.
 
 template <typename CList, typename... Ts>
@@ -43,15 +42,14 @@ consteval auto make_signature() -> Signature
 }
 
 
-// SystemBase<Derived, CMgr, ComponentTypes...>
-// =============================================================================
+// SystemBase
+// ===========
 
 template <typename Derived, typename CMgr, typename... ComponentTypes>
 class SystemBase
 {
   protected:
     // Sparse set — O(1) add, O(1) remove, O(n) sequential iteration
-    // -------------------------------------------------------------------------
     // dense[i]   = the i-th active entity (contiguous, iteration is sequential)
     // sparse[e]  = index of entity e in dense (INVALID = not in this system)
     //
@@ -93,7 +91,6 @@ class SystemBase
 
 
     // Entity management
-    // -------------------------------------------------------------------------
 
     void add_entity(Entity e)
     {
@@ -146,12 +143,14 @@ class SystemBase
     // Derived::update_impl(dt) directly. No virtual dispatch.
     void update(float dt)
     {
+        // Compile time Dispatch: That's why we take the Derived class as a parameter
+        // now we can cast to the correct Derived type and call it's method, resolved at
+        // compile type. In normal oop, this would be virtual in base and require vtable lookup
         static_cast<Derived*>(this)->update_impl(dt);
     }
 
   protected:
     // Component access helpers
-    // -------------------------------------------------------------------------
     // get_component<T>(e) goes: comp_manager.get_arr<T>().get_data(e)
     // This is two direct memory accesses — get_arr<T>() is a compile-time
     // std::get<> on the tuple, get_data(e) indexes into the dense vector.
@@ -174,3 +173,5 @@ class SystemBase
         return comp_manager.template get_arr<T>().has_data(e);
     }
 };
+
+

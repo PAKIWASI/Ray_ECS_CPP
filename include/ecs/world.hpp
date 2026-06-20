@@ -32,8 +32,9 @@
 #include "archetype.hpp"
 
 
-// World — primary template (intentionally incomplete)
-// =============================================================================
+// World
+// ======
+// primary template (intentionally incomplete)
 // Forces users to always instantiate with explicit ComponentList and SystemList.
 // Catching wrong usage at the template level rather than inside the body.
 
@@ -42,7 +43,7 @@ class World;
 
 
 // World<ComponentList<CList...>, SystemList<SList...>>
-// =============================================================================
+// =====================================================
 
 template <typename... CList, typename... SList>
 class World<ComponentList<CList...>, SystemList<SList...>>
@@ -50,7 +51,6 @@ class World<ComponentList<CList...>, SystemList<SList...>>
   public:
 
     // Type aliases — scoped to this World instantiation
-    // -------------------------------------------------------------------------
 
     using MyComponentList = ComponentList<CList...>;
     using MySystemList    = SystemList<SList...>;
@@ -82,8 +82,6 @@ class World<ComponentList<CList...>, SystemList<SList...>>
     // Archetype helper — binds CList so callers don't need to pass it
     template <typename... Ts>
     using Archetype = ::Archetype<MyComponentList, Ts...>;
-    // TODO: understand
-
 
   private:
 
@@ -97,7 +95,6 @@ class World<ComponentList<CList...>, SystemList<SList...>>
   public:
 
     // Entity API
-    // -------------------------------------------------------------------------
 
     [[nodiscard]] auto create_entity(Signature sig = 0) -> Entity
     {
@@ -115,7 +112,6 @@ class World<ComponentList<CList...>, SystemList<SList...>>
 
     // TODO: understand
     // Archetype creation
-    // -------------------------------------------------------------------------
 
     // Overload 1: default-construct each component
     // Use when you want to create entities in bulk and fill data afterwards
@@ -143,7 +139,6 @@ class World<ComponentList<CList...>, SystemList<SList...>>
 
 
     // Component API
-    // -------------------------------------------------------------------------
 
     template <ComponentType_t T>
     void add_component(Entity e, T comp)
@@ -181,7 +176,6 @@ class World<ComponentList<CList...>, SystemList<SList...>>
 
 
     // System API
-    // -------------------------------------------------------------------------
 
     void update(float dt, Schedule schedule)
     {

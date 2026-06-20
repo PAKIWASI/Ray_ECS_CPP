@@ -51,7 +51,6 @@ class SystemManagerImpl
     }
 
     // Signature-based entity routing
-    // -------------------------------------------------------------------------
 
     // Called whenever an entity's component set changes (add/remove component).
     // Checks every system: if the entity now qualifies → add it; if it no longer
@@ -73,7 +72,6 @@ class SystemManagerImpl
     }
 
     // Update
-    // -------------------------------------------------------------------------
     // Iterates the tuple via fold expression. For each system, checks its bit
     // in the schedule bitset. If set, calls update(dt) directly — no vtable.
     //
@@ -122,8 +120,8 @@ class SystemManagerImpl
 };
 
 
-// make_system_manager — unpacks SystemList into SystemManagerImpl
-// =============================================================================
+// unpacking SystemList into SystemManagerImpl
+// ============================================
 
 template <typename List>
 struct make_system_manager;

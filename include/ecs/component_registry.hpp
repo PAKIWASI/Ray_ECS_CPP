@@ -1,28 +1,25 @@
 #pragma once
 
-// ComponentList and comp_type_index — pure library infrastructure.
-//
-// This file deliberately does NOT include any game component headers (2d_comps.hpp etc).
-// It only needs common.hpp for ComponentType_t and ComponentType.
-// Game components are coupled to the user's game_registry.hpp, not here.
+// ComponentList and comp_type_index — pure library infrastructure
+// Game components are coupled to the user's game_registry.hpp
 
 #include "common.hpp"
 
 
-// ComponentList — ordered type list, position = permanent component ID
-// =============================================================================
+// ComponentList
+// ==============
+// ordered type list, position = permanent component ID
 
 // Wraps a parameter pack of component types.
 // The index of each type in the pack is its component ID.
-// Once defined in game_registry.hpp, NEVER reorder.
 template <ComponentType_t... Ts>
 struct ComponentList {
     static constexpr u8 count = sizeof...(Ts);
 };
 
 
-// comp_type_index — compile-time ID lookup
-// =============================================================================
+// Compile-time ID lookup
+// =======================
 // "What is the ID of type T in ComponentList List?"
 // Returns a constexpr u8. Hard error at compile time if T is not in List.
 

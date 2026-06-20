@@ -1,12 +1,10 @@
 #pragma once
 
-// ComponentArray<T>          — dense/sparse storage for one component type
-// ComponentManagerImpl<Ts...> — tuple of all arrays, no heap, no vtable
+// ComponentArray<T>            — dense/sparse storage for one component type
+// ComponentManagerImpl<Ts...>  — tuple of all arrays, no heap, no vtable
 // make_component_manager<List> — unpacks a ComponentList into ComponentManagerImpl
-//
-// No global ComponentManager alias here. The alias is created in world.hpp
-// via: using ComponentManager = make_component_manager<MyComponents>::type;
 
+#include "common.hpp"
 #include "component_registry.hpp"
 
 #include <array>
@@ -16,7 +14,7 @@
 
 
 // ComponentArray<T>
-// =============================================================================
+// ==================
 // Dense/sparse storage for a single component type T.
 //
 // Layout:
@@ -73,7 +71,8 @@ class ComponentArray
         idx_to_entity.pop_back();
     }
 
-    // Safe removal used by entity_destroyed fold — no assert if not present
+    // Safe removal used by entity_destroyed fold
+    // raw remove has a runtime assert and direct array access
     void remove_if_present(Entity e)
     {
         if (has_data(e)) { remove_data(e); }
@@ -81,20 +80,21 @@ class ComponentArray
 
     [[nodiscard]] auto get_data(Entity e) -> T&
     {
-        assert(e < MAX_ENTITIES       && "Entity out of range");
+        assert(e < MAX_ENTITIES && "Entity out of range");
         assert(entity_to_idx[e] != INVALID && "Entity does not have component");
         return data[entity_to_idx[e]];
     }
 
     [[nodiscard]] auto get_data(Entity e) const -> const T&
     {
-        assert(e < MAX_ENTITIES       && "Entity out of range");
+        assert(e < MAX_ENTITIES && "Entity out of range");
         assert(entity_to_idx[e] != INVALID && "Entity does not have component");
         return data[entity_to_idx[e]];
     }
 
     [[nodiscard]] auto has_data(Entity e) const -> bool
     {
+        assert(e < MAX_ENTITIES && "Entity out of range");
         return entity_to_idx[e] != INVALID;
     }
 
@@ -126,7 +126,7 @@ class ComponentArray
 
 
 // ComponentManagerImpl<Ts...>
-// =============================================================================
+// ============================
 // Stores one ComponentArray<T> per component type, inline in a tuple.
 // No heap allocation, no pointer indirection, no virtual dispatch.
 //
@@ -174,8 +174,8 @@ class ComponentManagerImpl
 };
 
 
-// make_component_manager — unpacks ComponentList into ComponentManagerImpl
-// =============================================================================
+// Unpacking ComponentList into ComponentManagerImpl
+// ==================================================
 // Usage: using ComponentManager = make_component_manager<MyComponents>::type;
 
 template <typename List>

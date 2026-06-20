@@ -3,7 +3,7 @@
 // Archetype<CList, Ts...>
 //
 // A named bundle of component types used for ergonomic entity creation.
-// NOT a storage strategy — components are still stored per-type in
+// NOTE: NOT a storage strategy — components are still stored per-type in
 // ComponentArray<T>, not grouped by archetype.
 //
 // CList is the ComponentList the archetype is defined against. It must be
@@ -18,8 +18,8 @@
 #include "component_registry.hpp"   // comp_type_index
 
 
-// ArchetypeType_t — concept for Archetype validation
-// =============================================================================
+// concept for Archetype validation
+// =================================
 
 template <typename T>
 concept ArchetypeType_t = requires {
@@ -29,7 +29,7 @@ concept ArchetypeType_t = requires {
 
 
 // Archetype<CList, Ts...>
-// =============================================================================
+// ========================
 
 template <typename CList, typename... Ts>
 struct Archetype
@@ -50,7 +50,7 @@ struct Archetype
     // Calls f.template operator()<T>() for each T in Ts...
     // Used by World::create_from_archetype to call add_data for each type.
     template <typename F>
-    static constexpr void for_each_type(F f)    // TODO: changed to normal lambda
+    static constexpr void for_each_type(F f)
     {
         (f.template operator()<Ts>(), ...);
     }
