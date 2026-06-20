@@ -112,9 +112,8 @@ class World<ComponentList<CList...>, SystemList<SList...>>
 
     // TODO: understand
     // Archetype creation
-
+ 
     // Overload 1: default-construct each component
-    // Use when you want to create entities in bulk and fill data afterwards
     template <ArchetypeType_t A>
     [[nodiscard]] auto create_from_archetype() -> Entity
     {
@@ -126,14 +125,26 @@ class World<ComponentList<CList...>, SystemList<SList...>>
         system_manager.on_signature_change(e, entity_manager.get_signature(e));
         return e;
     }
-
+ 
     // Overload 2: caller supplies initial component values
-    // Args must match the archetype's component types in order
+    // Args must match the archetype's component types in order.
+    //
+    // Does NOT call add_component() in a fold — that would fire
+    // on_signature_change once per component (O(systems × components)).
+    // Instead we store data and update the entity signature for each arg
+    // inline, then call on_signature_change exactly once at the end, matching
+    // the behaviour of overload 1.
     template <ArchetypeType_t A, typename... Args>
     [[nodiscard]] auto create_from_archetype(Args&&... args) -> Entity
     {
         Entity e = entity_manager.create();
-        (add_component(e, std::forward<Args>(args)), ...);
+        (
+            [&]<typename T>(T&& comp) -> void {
+                component_manager.template get_arr<T>().add_data(e, std::forward<T>(comp));
+                entity_manager.set_component(e, component_id<std::remove_cvref_t<T>>);
+            }(std::forward<Args>(args)),
+        ...);
+        system_manager.on_signature_change(e, entity_manager.get_signature(e));
         return e;
     }
 

@@ -110,9 +110,16 @@ class SystemBase
         u32    last_idx    = static_cast<u32>(dense.size()) - 1;
         Entity last_entity = dense[last_idx];
 
-        // Swap with last, update sparse for the moved entity
-        dense[idx]          = last_entity;
-        sparse[last_entity] = idx;
+        // Only swap if the target isn't already the last element.
+        // When idx == last_idx, last_entity == e: writing sparse[e] = idx
+        // before clearing it would survive the sparse[e] = INVALID below
+        // only because they're the same write — but the dense/sparse state
+        // would be consistent regardless. The guard is still correct and
+        // makes the intent explicit.
+        if (idx != last_idx) {
+            dense[idx]          = last_entity;
+            sparse[last_entity] = idx;
+        }
         dense.pop_back();
 
         // Clear the removed entity's sparse slot
@@ -174,4 +181,25 @@ class SystemBase
     }
 };
 
+
+// SystemType_t
+// =============
+// The single, authoritative concept for valid ECS systems.
+//
+// The inheritance check uses an immediately-invoked generic lambda: the
+// compiler must be able to convert T* to SystemBase<D,C,Cs...>* for some
+// deduced D, C, Cs... — i.e. T must publicly inherit from some instantiation
+// of SystemBase. This rules out duck-typed imposters that happen to expose the
+// right method names without going through the CRTP base.
+//
+// update_impl is the one method SystemBase does NOT provide — it is the pure
+// virtual equivalent in CRTP, and each concrete system must define it.
+template <typename T>
+concept SystemType_t =
+    requires(T& sys, float dt) { { sys.update_impl(dt) } -> std::same_as<void>; }
+    &&
+    requires {
+        []<typename D, typename C, typename... Cs>(SystemBase<D, C, Cs...>*) -> auto
+            {}(static_cast<T*>(nullptr));
+    };
 

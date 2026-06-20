@@ -12,7 +12,6 @@
 // make_system_manager<SList> unpacks a SystemList into SystemManagerImpl.
 
 #include "system_registry.hpp"
-
 #include <tuple>
 
 

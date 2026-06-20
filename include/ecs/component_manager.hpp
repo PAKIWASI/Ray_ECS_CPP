@@ -60,10 +60,16 @@ class ComponentArray
         u32    last_idx    = static_cast<u32>(data.size()) - 1;
         Entity last_entity = idx_to_entity[last_idx];
 
-        // Move last element into the vacated slot
-        data[idx]               = std::move(data[last_idx]);
-        idx_to_entity[idx]      = last_entity;
-        entity_to_idx[last_entity] = idx;
+        // When you remove the last entity in a ComponentArray, idx == last_idx.
+        // The swap-and-pop then reads from a slot that's already logically removed,
+        // and entity_to_idx[last_entity] = idx writes back a now-invalid index
+        // before pop_back clears it. Needs a guard:
+        if (idx != last_idx) {
+            // Move last element into the vacated slot
+            data[idx]               = std::move(data[last_idx]);
+            idx_to_entity[idx]      = last_entity;
+            entity_to_idx[last_entity] = idx;
+        }
 
         // Erase the now-duplicate last slot
         entity_to_idx[e] = INVALID;

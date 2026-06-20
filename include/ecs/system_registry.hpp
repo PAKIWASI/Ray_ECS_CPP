@@ -1,6 +1,6 @@
 #pragma once
 
-#include "common.hpp"
+#include "system_base.hpp"
 
 
 // Ordered type list, position = permanent system ID
