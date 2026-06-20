@@ -98,7 +98,7 @@ class SystemManagerImpl
     }
 
     template <typename T>
-    [[nodiscard]] auto get_entity_count() const -> u32
+    [[nodiscard]] auto get_entity_count() const -> uint32_t
     {
         return std::get<T>(systems).get_entity_count();
     }

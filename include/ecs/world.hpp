@@ -200,7 +200,7 @@ class World<ComponentList<CList...>, SystemList<SList...>>
     }
 
     template <typename T>
-    [[nodiscard]] auto get_entity_count() const -> u32
+    [[nodiscard]] auto get_entity_count() const -> uint32_t
     {
         return system_manager.template get_entity_count<T>();
     }

@@ -56,7 +56,7 @@ class SystemBase
     // Invariant: sparse[dense[i]] == i for all i < dense.size()
     //            dense[sparse[e]] == e for all e with sparse[e] != INVALID
     std::vector<Entity>           dense;
-    std::array<u32, MAX_ENTITIES> sparse{};
+    std::array<uint32_t, MAX_ENTITIES> sparse{};
 
     // Single runtime reference — the only non-constexpr data besides the entity set
     CMgr& comp_manager;
@@ -97,7 +97,7 @@ class SystemBase
         assert(e < MAX_ENTITIES  && "Entity out of range");
         assert(!has_entity(e)    && "Entity already in system");
 
-        sparse[e] = static_cast<u32>(dense.size());
+        sparse[e] = static_cast<uint32_t>(dense.size());
         dense.emplace_back(e);
     }
 
@@ -106,8 +106,8 @@ class SystemBase
         assert(e < MAX_ENTITIES && "Entity out of range");
         assert(has_entity(e)    && "Entity not in system");
 
-        u32    idx         = sparse[e];
-        u32    last_idx    = static_cast<u32>(dense.size()) - 1;
+        uint32_t    idx         = sparse[e];
+        uint32_t    last_idx    = static_cast<uint32_t>(dense.size()) - 1;
         Entity last_entity = dense[last_idx];
 
         // Only swap if the target isn't already the last element.
@@ -132,7 +132,7 @@ class SystemBase
         // Triple check: slot not INVALID, index in bounds, cross-reference valid
         // Guards against stale indices after swap-and-pop
         return sparse[e] != INVALID
-            && sparse[e] < static_cast<u32>(dense.size())
+            && sparse[e] < static_cast<uint32_t>(dense.size())
             && dense[sparse[e]] == e;
     }
 
@@ -141,9 +141,9 @@ class SystemBase
         return signature;
     }
 
-    [[nodiscard]] auto get_entity_count() const -> u32
+    [[nodiscard]] auto get_entity_count() const -> uint32_t
     {
-        return static_cast<u32>(dense.size());
+        return static_cast<uint32_t>(dense.size());
     }
 
     // CRTP dispatch — SystemManagerImpl calls sys.update(dt) which calls

@@ -30,7 +30,7 @@ class ComponentArray
   private:
     std::vector<T>                data;
     std::vector<Entity>           idx_to_entity;
-    std::array<u32, MAX_ENTITIES> entity_to_idx{};
+    std::array<uint32_t, MAX_ENTITIES> entity_to_idx{};
 
   public:
 
@@ -46,7 +46,7 @@ class ComponentArray
         assert(e < MAX_ENTITIES       && "Entity out of range");
         assert(entity_to_idx[e] == INVALID && "Entity already has component");
 
-        entity_to_idx[e] = static_cast<u32>(data.size());
+        entity_to_idx[e] = static_cast<uint32_t>(data.size());
         idx_to_entity.emplace_back(e);
         data.emplace_back(std::move(comp));
     }
@@ -56,8 +56,8 @@ class ComponentArray
         assert(e < MAX_ENTITIES       && "Entity out of range");
         assert(entity_to_idx[e] != INVALID && "Entity does not have component");
 
-        u32    idx         = entity_to_idx[e];
-        u32    last_idx    = static_cast<u32>(data.size()) - 1;
+        uint32_t    idx         = entity_to_idx[e];
+        uint32_t    last_idx    = static_cast<uint32_t>(data.size()) - 1;
         Entity last_entity = idx_to_entity[last_idx];
 
         // When you remove the last entity in a ComponentArray, idx == last_idx.
@@ -106,24 +106,24 @@ class ComponentArray
 
     // Direct sequential access — used by systems to drive iteration from the
     // smallest component array instead of going through the entity set
-    [[nodiscard]] auto entity_count() const -> u32
+    [[nodiscard]] auto entity_count() const -> uint32_t
     {
-        return static_cast<u32>(data.size());
+        return static_cast<uint32_t>(data.size());
     }
 
-    [[nodiscard]] auto entity_at(u32 idx) const -> Entity
+    [[nodiscard]] auto entity_at(uint32_t idx) const -> Entity
     {
         assert(idx < data.size() && "Index out of range");
         return idx_to_entity[idx];
     }
 
-    [[nodiscard]] auto data_at(u32 idx) -> T&
+    [[nodiscard]] auto data_at(uint32_t idx) -> T&
     {
         assert(idx < data.size() && "Index out of range");
         return data[idx];
     }
 
-    [[nodiscard]] auto data_at(u32 idx) const -> const T&
+    [[nodiscard]] auto data_at(uint32_t idx) const -> const T&
     {
         assert(idx < data.size() && "Index out of range");
         return data[idx];

@@ -1,34 +1,43 @@
 #pragma once
 
-#include "wasi.hpp"
-
 #include <bitset>
 #include <concepts>
+#include <cstdint>
 #include <limits>
-
-using namespace wasi;
 
 
 // Configuration
+// ==============
 
-constexpr u32 MAX_ENTITIES  = 1000;
-constexpr u8  MAX_COMPONENTS = 32;
-constexpr u8  MAX_SYSTEMS    = 16;
-constexpr u32 PRE_INIT_SIZE  = 100;
+constexpr uint32_t MAX_ENTITIES  = 4096;
+constexpr uint8_t  MAX_COMPONENTS = 32;
+constexpr uint8_t  MAX_SYSTEMS    = 16;
+// TODO: make this container wise
+constexpr uint32_t PRE_INIT_SIZE  = 100;
 
 
 // Core type aliases
+// ==================
 
-using Entity        = u32;
+// an entity is just and id - an index into each component array, which hold data
+using Entity        = uint32_t;
+// a bitfield where each bit represents the presence/absense of each component 
 using Signature     = std::bitset<MAX_COMPONENTS>;
-using ComponentType = u8;
-using SystemType    = u8;
+// the component id type, index into Signature
+using ComponentType = uint8_t;
+// the system id type, index into Schedule
+using SystemType    = uint8_t;
+// bits in Schedule represent which systems to run in an update function
+// we don't always blindly update each system each frame
 using Schedule      = std::bitset<MAX_SYSTEMS>;
 
-static constexpr u32 INVALID = std::numeric_limits<u32>::max();
+// a sentient representing an entity id that not been issued
+// used in dense/sparse arrays where we index into sparse to find actual entity index in dense
+static constexpr uint32_t INVALID = std::numeric_limits<uint32_t>::max();
 
 
-// Concepts
+// Component Concept
+// ==================
 
 // What counts as a component: must be default-constructible and movable.
 // Default-constructible so ComponentArray can pre-allocate slots.

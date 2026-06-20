@@ -14,14 +14,14 @@
 // The index of each type in the pack is its component ID.
 template <ComponentType_t... Ts>
 struct ComponentList {
-    static constexpr u8 count = sizeof...(Ts);
+    static constexpr uint8_t count = sizeof...(Ts);
 };
 
 
 // Compile-time ID lookup
 // =======================
 // "What is the ID of type T in ComponentList List?"
-// Returns a constexpr u8. Hard error at compile time if T is not in List.
+// Returns a constexpr uint8_t. Hard error at compile time if T is not in List.
 
 // Primary template — intentionally undefined. Instantiating with anything
 // other than a ComponentList triggers an incomplete type error.
@@ -33,12 +33,12 @@ struct comp_type_index;
 template <typename T, typename... Ts>
 struct comp_type_index<T, ComponentList<Ts...>>
 {
-    static constexpr u8 value = []() consteval -> u8
+    static constexpr uint8_t value = []() consteval -> uint8_t
     {
         // Expand the pack into a bool array: matches[i] = (T == Ts[i])
         constexpr bool matches[] { std::is_same_v<T, Ts>... };
 
-        for (u8 i = 0; i < sizeof...(Ts); ++i) {
+        for (uint8_t i = 0; i < sizeof...(Ts); ++i) {
             if (matches[i]) { return i; }
         }
 
@@ -46,7 +46,7 @@ struct comp_type_index<T, ComponentList<Ts...>>
         // The returned max value will be caught by static_asserts in
         // game_registry.hpp. We cannot static_assert(false) here because
         // that fires before instantiation in C++ pre-C++26.
-        return std::numeric_limits<u8>::max();
+        return std::numeric_limits<uint8_t>::max();
     }();
 };
 

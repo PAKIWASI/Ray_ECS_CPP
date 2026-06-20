@@ -29,7 +29,7 @@ class MovementSystem : public SystemBase<MovementSystem<CMgr>, CMgr, Transform2,
         auto& rigidbodies = this->comp_manager.template get_arr<RigidBody2>();
         auto& transforms  = this->comp_manager.template get_arr<Transform2>();
 
-        for (u32 i = 0; i < rigidbodies.entity_count(); ++i)
+        for (uint32_t i = 0; i < rigidbodies.entity_count(); ++i)
         {
             Entity e  = rigidbodies.entity_at(i);  // sequential — free
             auto&  rb = rigidbodies.data_at(i);    // sequential — free

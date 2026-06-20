@@ -23,7 +23,7 @@
 
 template <typename T>
 concept ArchetypeType_t = requires {
-    { T::size()      } -> std::same_as<u8>;
+    { T::size()      } -> std::same_as<uint8_t>;
     { T::signature() } -> std::same_as<Signature>;
 };
 
@@ -35,7 +35,7 @@ template <typename CList, typename... Ts>
 struct Archetype
 {
     // Compute the signature from component IDs at compile time.
-    // comp_type_index<T, CList>::value is a constexpr u8 — no runtime cost.
+    // comp_type_index<T, CList>::value is a constexpr uint8_t — no runtime cost.
     static consteval auto signature() -> Signature
     {
         Signature sig{};
@@ -44,7 +44,7 @@ struct Archetype
     }
 
     // Number of component types in this archetype
-    static constexpr auto size() -> u8 { return sizeof...(Ts); }
+    static constexpr auto size() -> uint8_t { return sizeof...(Ts); }
 
     // Iterate over all component types in this archetype at compile time.
     // Calls f.template operator()<T>() for each T in Ts...

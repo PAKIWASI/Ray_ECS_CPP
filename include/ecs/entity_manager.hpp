@@ -8,10 +8,10 @@
 
 
 // EntityManager
-// =============================================================================
+// ==============
 // Issues and recycles entity IDs. Stores per-entity component signatures.
 //
-// IDs are u32 indices into component arrays. Destroyed IDs go into free_ids
+// IDs are uint32_t indices into component arrays. Destroyed IDs go into free_ids
 // for reuse. Signatures are a bitset of which components the entity has —
 // maintained here so SystemManager can check qualification without touching
 // component arrays.
