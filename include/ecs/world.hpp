@@ -98,6 +98,7 @@ class World<ComponentList<CList...>, SystemList<SList...>>
 
     [[nodiscard]] auto create_entity(Signature sig) -> Entity
     {
+        assert(sig.any() && "Entity should have atleast one Component");
         return entity_manager.create(sig);
     }
 

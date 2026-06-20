@@ -46,10 +46,10 @@ class EntityManager
 
     void destroy(Entity e)
     {
-        // second check prevents double destroy of entities
+        assert(e < next_id && "Entity out of range");
+        // prevents double destroy of entities
         // entity is always initilized with atleast one component
-        assert(e < next_id && !signatures.at(e).none()
-               && "Entity out of range");
+        assert(signatures.at(e).any() && "Entity is not in use");
         signatures.at(e).reset();
         free_ids.emplace_back(e);
     }

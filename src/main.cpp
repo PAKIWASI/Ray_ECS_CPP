@@ -6,7 +6,9 @@ auto main() -> int
     GameWorld game {};
     Entity player = game.create_from_archetype<PlayerArchetype>();
 
-    game.update(1.0, MOVEMENT_ONLY);
+    game.destroy_entity(player);
+    game.destroy_entity(player);
+
 
     return 0;
 }
