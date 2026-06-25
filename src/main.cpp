@@ -3,11 +3,13 @@
 
 auto main() -> int
 {
+
     GameWorld game {};
     Entity player = game.create_from_archetype<PlayerArchetype>();
 
+
     game.destroy_entity(player);
-    game.destroy_entity(player);
+
 
 
     return 0;

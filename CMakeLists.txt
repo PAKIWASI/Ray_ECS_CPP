@@ -59,20 +59,4 @@ target_include_directories(main PRIVATE
 target_link_libraries(main PRIVATE ${RAYLIB_LIB})
 
 
-add_executable(bench
-    bench/bench_main.cpp
-    ${SRC_FILES}
-)
-
-target_include_directories(bench PRIVATE
-    include
-    include/ecs
-    include/ecs/components
-    include/ecs/systems
-    ${RAYLIB_INCLUDE_DIR}
-)
-
-# Link raylib
-target_link_libraries(bench PRIVATE ${RAYLIB_LIB})
-
 
